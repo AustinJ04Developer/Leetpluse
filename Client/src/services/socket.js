@@ -4,7 +4,7 @@ let socket = null;
 
 export const initSocketClient = () => {
   if (!socket) {
-    socket = io('http://localhost:5000', {
+    socket = io('https://leetpluse.onrender.com', {
       autoConnect: true,
       transports: ['websocket', 'polling']
     });
