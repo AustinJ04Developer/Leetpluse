@@ -120,7 +120,7 @@ function App() {
               <Route path="/devadmin/impersonate" element={<ProtectedRoute minLevel={3}><ImpersonationToolPage /></ProtectedRoute>} />
 
               {/* Shared */}
-              <Route path="/user-progress" element={<ProtectedRoute minLevel={2}><UserProgressPage /></ProtectedRoute>} />
+              <Route path="/user-progress" element={<ProtectedRoute minLevel={1}><UserProgressPage /></ProtectedRoute>} />
               <Route path="/weekly-problems" element={<Navigate to="/user-progress" replace />} />
               <Route path="/leaderboard" element={<GlobalLeaderboard />} />
               <Route path="/notifications" element={<NotificationsPage />} />

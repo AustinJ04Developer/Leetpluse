@@ -6,7 +6,7 @@ import { Activity, Sliders, FileText, Terminal, Users, Cpu, Database, UserCheck,
 import { Link } from 'react-router-dom';
 
 const DevAdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('management'); // 'personal' or 'management'
+  const [activeTab, setActiveTab] = useState('management'); // 'management' or 'personal'
   const [health, setHealth] = useState(null);
 
   useEffect(() => {

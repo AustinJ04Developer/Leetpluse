@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../context/SocketContext';
 import api from '../../services/api';
 import StatCard from '../../components/StatCard';
 import ContributionHeatmap from '../../components/ContributionHeatmap';
+import DailyProgressCalendar from '../../components/DailyProgressCalendar';
 import TopicRadarChart from '../../components/TopicRadarChart';
 
 import { 
@@ -299,6 +300,26 @@ const UserDashboard = () => {
 
       {/* 365-Day Contribution Heatmap */}
       <ContributionHeatmap submissionLogs={heatmapLogs} />
+
+      {/* Embedded Personal Daily Progress Log */}
+      <div className="glass-card rounded-3xl p-6 border border-slate-800 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-base font-bold text-white flex items-center gap-2">
+              <Calendar className="w-4 h-4 text-indigo-400" /> Daily Progress History
+            </h3>
+            <p className="text-xs text-slate-400">Detailed breakdown of your daily solved problems and submission logs</p>
+          </div>
+          <Link
+            to="/user-progress"
+            className="px-3.5 py-1.5 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 text-indigo-300 border border-indigo-500/30 text-xs font-bold transition-all flex items-center gap-1.5"
+          >
+            <span>Daily Leaderboard</span>
+            <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
+          </Link>
+        </div>
+        <DailyProgressCalendar userId={user?.id || user?._id} />
+      </div>
     </div>
   );
 };

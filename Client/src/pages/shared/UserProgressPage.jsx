@@ -497,6 +497,9 @@ const UserProgressPage = () => {
                                   {isSelf && (
                                     <span className="text-[9px] font-extrabold bg-indigo-600 text-white px-1.5 py-0.2 rounded">YOU</span>
                                   )}
+                                  {memberUser.role === 'devadmin' && (
+                                    <span className="text-[9px] font-extrabold bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.2 rounded uppercase">DEVADMIN</span>
+                                  )}
                                   <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
                                     Lvl {memberUser.level || 1}
                                   </span>
@@ -662,6 +665,9 @@ const UserProgressPage = () => {
                           <h3 className="text-base font-extrabold text-white">{memberUser.name}</h3>
                           {isSelf && (
                             <span className="text-[9px] font-extrabold bg-indigo-600 text-white px-2 py-0.2 rounded">YOU</span>
+                          )}
+                          {memberUser.role === 'devadmin' && (
+                            <span className="text-[9px] font-extrabold bg-purple-500/20 text-purple-400 border border-purple-500/30 px-1.5 py-0.2 rounded uppercase">DEVADMIN</span>
                           )}
                         </div>
                         <p className="text-xs text-slate-400 font-mono">@{memberUser.leetcodeUsername || 'unlinked'}</p>

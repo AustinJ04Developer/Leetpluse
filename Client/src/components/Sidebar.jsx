@@ -27,6 +27,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const userNav = [
     { name: 'My Analytics', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Daily Progress', path: '/user-progress', icon: Calendar },
     { name: 'Leaderboards', path: '/leaderboard', icon: Trophy },
     { name: 'Goals & Targets', path: '/goals', icon: Target },
     { name: 'Notifications', path: '/notifications', icon: Bell }
