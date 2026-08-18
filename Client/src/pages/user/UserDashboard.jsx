@@ -5,7 +5,9 @@ import { useSocket } from '../../context/SocketContext';
 import api from '../../services/api';
 import StatCard from '../../components/StatCard';
 import ContributionHeatmap from '../../components/ContributionHeatmap';
+import DailyProgressCalendar from '../../components/DailyProgressCalendar';
 import TopicRadarChart from '../../components/TopicRadarChart';
+
 import { 
   Trophy, 
   Flame, 
@@ -91,6 +93,44 @@ const UserDashboard = () => {
   const hard = stats?.hardSolved || 0;
   const total = stats?.totalSolved || 0;
 
+  // Calculate Today's Solved and Current Week's Total Solved from logs
+  const getTodayAndWeeklyStats = () => {
+    const logMap = {};
+    heatmapLogs.forEach((log) => {
+      logMap[log.date] = log;
+    });
+
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const todayKey = `${y}-${m}-${d}`;
+    const todayLog = logMap[todayKey];
+    const todaySolved = todayLog ? todayLog.count : 0;
+
+    const dayOfWeek = now.getDay();
+    const distToMon = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() - distToMon);
+
+    let weeklySolved = 0;
+    for (let i = 0; i < 7; i++) {
+      const dayDate = new Date(monday);
+      dayDate.setDate(monday.getDate() + i);
+      const dy = dayDate.getFullYear();
+      const dm = String(dayDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(dayDate.getDate()).padStart(2, '0');
+      const dateKey = `${dy}-${dm}-${dd}`;
+      if (logMap[dateKey]) {
+        weeklySolved += logMap[dateKey].count || 0;
+      }
+    }
+
+    return { todaySolved, weeklySolved };
+  };
+
+  const { todaySolved, weeklySolved } = getTodayAndWeeklyStats();
+
   return (
     <div className="space-y-6">
       {/* Header Profile Banner */}
@@ -130,14 +170,23 @@ const UserDashboard = () => {
       </div>
 
       {/* Top Stat Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatCard
+          title="Daily Solved"
+          value={`${todaySolved}`}
+          subtitle={`Weekly Total: ${weeklySolved} solved`}
+          icon={Sparkles}
+          color="emerald"
+          badgeText="Daily & Weekly"
+        />
+
         <StatCard
           title="Total Solved"
           value={total}
           subtitle={`Global rank #${(stats?.globalRanking || 42000).toLocaleString()}`}
           icon={Trophy}
           color="indigo"
-          badgeText="Across Easy, Medium & Hard"
+          badgeText="All Time"
         />
 
         <StatCard
@@ -146,7 +195,7 @@ const UserDashboard = () => {
           subtitle={`Personal Best: ${stats?.longestStreak || 0} Days`}
           icon={Flame}
           color="amber"
-          badgeText="Daily solve target met"
+          badgeText="Daily target met"
         />
 
         <StatCard
@@ -155,18 +204,19 @@ const UserDashboard = () => {
           subtitle="Clean submission ratio"
           icon={CheckCircle2}
           color="emerald"
-          badgeText="High accuracy tier"
+          badgeText="Accuracy tier"
         />
 
         <StatCard
           title="Contest Rating"
           value={stats?.contestRating || 1750}
-          subtitle="Knight / Guardian candidate"
+          subtitle="Knight / Guardian"
           icon={TrendingUp}
           color="purple"
           badgeText="Rated contestant"
         />
       </div>
+
 
       {/* Main Breakdown Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -247,6 +297,9 @@ const UserDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* Daily Progress Interactive Calendar */}
+      <DailyProgressCalendar />
 
       {/* 365-Day Contribution Heatmap */}
       <ContributionHeatmap submissionLogs={heatmapLogs} />

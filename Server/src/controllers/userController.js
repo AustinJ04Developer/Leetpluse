@@ -62,6 +62,36 @@ const getAllUsers = async (req, res) => {
   }
 };
 
+const getAccessibleUsers = async (req, res) => {
+  try {
+    const requester = req.user;
+    let query = { role: { $ne: 'superadmin' } }; // Exclude SuperAdmin management role
+
+    if (requester.roleLevel === 1) { // Regular User: cohort peers
+      if (requester.groupId) {
+        query.groupId = requester.groupId;
+      } else {
+        query._id = requester._id;
+      }
+    } else if (requester.roleLevel === 2) { // Admin: assigned batch
+      if (requester.groupId) {
+        query.groupId = requester.groupId;
+      }
+    } else if (requester.roleLevel >= 3 && req.query.groupId && req.query.groupId !== 'all') {
+      query.groupId = req.query.groupId;
+    }
+
+    const users = await User.find(query)
+      .select('name email avatar role leetcodeUsername xp level groupId')
+      .populate('groupId', 'name');
+
+    res.json({ success: true, users });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+
 const updateUserRole = async (req, res) => {
   try {
     const { userId } = req.params;
@@ -154,4 +184,5 @@ const bulkImportUsers = async (req, res) => {
   }
 };
 
-module.exports = { updateProfile, getAllUsers, updateUserRole, bulkImportUsers };
+module.exports = { updateProfile, getAllUsers, getAccessibleUsers, updateUserRole, bulkImportUsers };
+

@@ -1,9 +1,11 @@
 const LeetCodeStat = require('../models/LeetCodeStat');
 const SubmissionLog = require('../models/SubmissionLog');
 const User = require('../models/User');
+const Group = require('../models/Group');
 const { syncUserLeetCode } = require('../services/leetcodeService');
 const { emitToUser } = require('../services/socketService');
 const { getLeaderboardFilter } = require('../middleware/scope');
+
 
 const getStats = async (req, res) => {
   try {
@@ -97,15 +99,19 @@ const getHeatmap = async (req, res) => {
     const requester = req.user;
     let targetUserId = req.params.userId || requester._id.toString();
 
-    // Server-side Scope Enforcement
-    if (requester.roleLevel === 1 && targetUserId.toString() !== requester._id.toString()) {
-      return res.status(403).json({ success: false, message: 'Forbidden: Access restricted to own activity graph only.' });
-    } else if (requester.roleLevel === 2 && targetUserId.toString() !== requester._id.toString()) {
-      const targetUser = await User.findById(targetUserId);
-      if (!targetUser || !targetUser.groupId || targetUser.groupId.toString() !== requester.groupId?.toString()) {
-        return res.status(403).json({ success: false, message: 'Forbidden: Access restricted to assigned batch members only.' });
+    // Server-side Scope Enforcement: allow viewing heatmaps for cohort members
+    if (targetUserId.toString() !== requester._id.toString()) {
+      if (requester.roleLevel <= 2) {
+        const targetUser = await User.findById(targetUserId);
+        if (!targetUser || !targetUser.groupId || !requester.groupId || targetUser.groupId.toString() !== requester.groupId.toString()) {
+          return res.status(403).json({ 
+            success: false, 
+            message: 'Forbidden: Access restricted to members in your assigned cohort.' 
+          });
+        }
       }
     }
+
 
     const targetUserDoc = await User.findById(targetUserId);
     if (targetUserDoc && targetUserDoc.role === 'superadmin') {
@@ -145,4 +151,69 @@ const getLeaderboard = async (req, res) => {
   }
 };
 
-module.exports = { getStats, triggerSyncNow, getHeatmap, getLeaderboard };
+const getBatchProgressMatrix = async (req, res) => {
+  try {
+    const requester = req.user;
+    const { groupId } = req.query;
+
+    let userQuery = { role: { $ne: 'superadmin' } };
+
+    if (requester.roleLevel === 1) { // User: cohort peers
+      if (requester.groupId) {
+        userQuery.groupId = requester.groupId;
+      } else {
+        userQuery._id = requester._id;
+      }
+    } else if (requester.roleLevel === 2) { // Admin: assigned batch
+      if (requester.groupId) {
+        userQuery.groupId = requester.groupId;
+      }
+    } else if (requester.roleLevel >= 3 && groupId && groupId !== 'all') {
+      userQuery.groupId = groupId;
+    }
+
+    const users = await User.find(userQuery)
+      .select('name email avatar role leetcodeUsername xp level groupId')
+      .populate('groupId', 'name')
+      .sort({ name: 1 });
+
+    const userIds = users.map(u => u._id);
+
+    const [statsList, allLogs] = await Promise.all([
+      LeetCodeStat.find({ userId: { $in: userIds } }),
+      SubmissionLog.find({ userId: { $in: userIds } }).sort({ date: 1 })
+    ]);
+
+    const statsMap = {};
+    statsList.forEach(s => {
+      statsMap[s.userId.toString()] = s;
+    });
+
+    const logsMap = {};
+    allLogs.forEach(l => {
+      const uId = l.userId.toString();
+      if (!logsMap[uId]) logsMap[uId] = [];
+      logsMap[uId].push(l);
+    });
+
+    const membersProgress = users.map(u => {
+      const uId = u._id.toString();
+      return {
+        user: u,
+        stats: statsMap[uId] || null,
+        logs: logsMap[uId] || []
+      };
+    });
+
+    res.json({
+      success: true,
+      totalMembers: membersProgress.length,
+      membersProgress
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { getStats, triggerSyncNow, getHeatmap, getLeaderboard, getBatchProgressMatrix };
+

@@ -32,6 +32,9 @@ import ImpersonationToolPage from './pages/devadmin/ImpersonationToolPage';
 import GlobalLeaderboard from './pages/shared/GlobalLeaderboard';
 import NotificationsPage from './pages/shared/NotificationsPage';
 import SettingsPage from './pages/shared/SettingsPage';
+import UserProgressPage from './pages/shared/UserProgressPage';
+
+
 
 const ProtectedRoute = ({ children, minLevel = 1 }) => {
   const { user, loading } = useAuth();
@@ -64,19 +67,22 @@ const DefaultRoleRedirect = () => {
 };
 
 const AppLayout = ({ children }) => {
+  const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
+
   return (
     <div className="min-h-screen bg-[#0b0f19] text-slate-100 flex flex-col">
       <ImpersonationBar />
-      <Navbar />
-      <div className="flex-1 flex">
-        <Sidebar />
-        <main className="flex-1 p-8 overflow-y-auto">
+      <Navbar onToggleMobileMenu={() => setMobileMenuOpen(!mobileMenuOpen)} />
+      <div className="flex-1 flex relative">
+        <Sidebar isOpen={mobileMenuOpen} onClose={() => setMobileMenuOpen(false)} />
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-y-auto max-w-full">
           {children}
         </main>
       </div>
     </div>
   );
 };
+
 
 function App() {
   return (
@@ -114,9 +120,13 @@ function App() {
               <Route path="/devadmin/impersonate" element={<ProtectedRoute minLevel={3}><ImpersonationToolPage /></ProtectedRoute>} />
 
               {/* Shared */}
+              <Route path="/user-progress" element={<UserProgressPage />} />
+              <Route path="/weekly-problems" element={<Navigate to="/user-progress" replace />} />
               <Route path="/leaderboard" element={<GlobalLeaderboard />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+
+
 
               {/* Default redirect */}
               <Route path="*" element={<DefaultRoleRedirect />} />

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
 import StatCard from '../../components/StatCard';
+import UserProgressPage from '../shared/UserProgressPage';
 import { 
   Building2, 
   Users, 
@@ -18,6 +19,7 @@ import {
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 const SuperAdminDashboard = () => {
+
   const [data, setData] = useState(null);
   const [announcementTitle, setAnnouncementTitle] = useState('');
   const [announcementMsg, setAnnouncementMsg] = useState('');
@@ -345,6 +347,12 @@ const SuperAdminDashboard = () => {
           </div>
         </form>
       </div>
+
+      {/* All Members Daily Progress Board section */}
+      <div className="pt-4 border-t border-slate-800/80">
+        <UserProgressPage />
+      </div>
+
 
       {/* Admin Creation Modal */}
       {modalOpen && (

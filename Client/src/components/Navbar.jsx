@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Bell, ShieldCheck, User, LogOut, ChevronDown, Activity } from 'lucide-react';
+import { Bell, ShieldCheck, User, LogOut, ChevronDown, Activity, Menu } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import SyncStatusBadge from './SyncStatusBadge';
 import api from '../services/api';
 
 import UserAvatar from './UserAvatar';
 
-const Navbar = () => {
+const Navbar = ({ onToggleMobileMenu }) => {
   const { user, logout } = useAuth();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -37,27 +37,42 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="h-16 bg-[#0b0f19]/90 border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-md px-6 flex items-center justify-between">
-      {/* Brand */}
+    <nav className="h-16 bg-[#0b0f19]/90 border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between">
+      {/* Brand & Mobile Hamburger */}
       <div className="flex items-center gap-3">
+        {user && (
+          <button
+            onClick={onToggleMobileMenu}
+            className="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 md:hidden transition-colors"
+            title="Toggle Menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        )}
+
         <Link to="/" className="flex items-center gap-2.5 group">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-amber-500 p-0.5 shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-amber-500 p-0.5 shadow-lg shadow-indigo-500/25 group-hover:scale-105 transition-transform">
             <div className="w-full h-full bg-slate-950 rounded-[10px] flex items-center justify-center">
-              <Activity className="w-5 h-5 text-indigo-400" />
+              <Activity className="w-4 h-4 sm:w-5 sm:h-5 text-indigo-400" />
             </div>
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <span className="font-extrabold text-lg text-white tracking-tight">LEETPULSE</span>
-              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase">Pro</span>
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="font-extrabold text-base sm:text-lg text-white tracking-tight">LEETPULSE</span>
+              <span className="text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20 uppercase">Pro</span>
             </div>
-            <p className="text-[11px] text-slate-400 font-medium">LeetCode Monitoring & Analytics Platform</p>
+            <p className="text-[10px] sm:text-[11px] text-slate-400 font-medium hidden sm:block">LeetCode Monitoring & Analytics Platform</p>
           </div>
         </Link>
       </div>
 
       {/* Center - Live Sync Badge (Not shown for SuperAdmin as they are management-only) */}
-      {user && user.role !== 'superadmin' && <SyncStatusBadge user={user} />}
+      {user && user.role !== 'superadmin' && (
+        <div className="hidden sm:block">
+          <SyncStatusBadge user={user} />
+        </div>
+      )}
+
 
       {/* Right User Control */}
       {user && (

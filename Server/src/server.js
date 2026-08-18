@@ -1,5 +1,7 @@
+// Server entry point - LeetPulse API Engine
 const express = require('express');
 const http = require('http');
+
 const cors = require('cors');
 const dotenv = require('dotenv');
 dotenv.config();
@@ -17,6 +19,7 @@ const superadminRoutes = require('./routes/superadminRoutes');
 const devadminRoutes = require('./routes/devadminRoutes');
 const goalRoutes = require('./routes/goalRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const weeklyProblemRoutes = require('./routes/weeklyProblemRoutes');
 
 const app = express();
 const server = http.createServer(app);
@@ -25,7 +28,8 @@ const server = http.createServer(app);
 initSocket(server);
 
 // Middleware
-app.use(cors({ origin: '*', credentials: true }));
+const allowedOrigins = process.env.CLIENT_URL ? [process.env.CLIENT_URL.replace(/\/$/, '')] : '*';
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json());
 
 // Routes
@@ -37,11 +41,25 @@ app.use('/api/superadmin', superadminRoutes);
 app.use('/api/devadmin', devadminRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/weekly-problems', weeklyProblemRoutes);
 
-// Health check endpoint
+// Base API welcome & Health check endpoints
+app.get(['/', '/api'], (req, res) => {
+  res.json({
+    name: 'LEETPULSE API Engine',
+    version: '1.0.0',
+    status: 'ONLINE',
+    message: 'LeetCode Monitoring & Analytics Platform Backend Service is Running',
+    health: '/api/health',
+    timestamp: new Date()
+  });
+});
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'LeetCode Monitoring Engine Active', timestamp: new Date() });
 });
+
+
 
 const PORT = process.env.PORT || 5000;
 

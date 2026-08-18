@@ -3,7 +3,8 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import UserDashboard from '../user/UserDashboard';
 import UserAvatar from '../../components/UserAvatar';
-import { Users, AlertTriangle, Download, Mail, CheckCircle, Search, UserCheck, UserPlus, X } from 'lucide-react';
+import UserCalendarModal from '../../components/UserCalendarModal';
+import { Users, AlertTriangle, Download, Mail, CheckCircle, Search, UserCheck, UserPlus, X, Calendar } from 'lucide-react';
 
 const AdminDashboard = () => {
   const { user } = useAuth();
@@ -14,6 +15,8 @@ const AdminDashboard = () => {
   const [selectedUserIds, setSelectedUserIds] = useState([]);
   const [notifyMsg, setNotifyMsg] = useState('');
   const [statusAlert, setStatusAlert] = useState('');
+  const [inspectingUser, setInspectingUser] = useState(null);
+
 
   // Add User to Batch Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -362,16 +365,25 @@ const AdminDashboard = () => {
                           )}
                         </td>
                         <td className="py-3 px-3 text-right">
-                          <button
-                            onClick={() => {
-                              setSelectedUserIds([u._id]);
-                              setNotifyMsg('Your streak is at risk! Submit a problem today.');
-                            }}
-                            className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
-                            title="Notify User"
-                          >
-                            <Mail className="w-4 h-4" />
-                          </button>
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={() => setInspectingUser(u)}
+                              className="p-1.5 rounded-lg bg-indigo-600/10 border border-indigo-500/20 text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all"
+                              title="View Progress Calendar"
+                            >
+                              <Calendar className="w-4 h-4" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedUserIds([u._id]);
+                                setNotifyMsg('Your streak is at risk! Submit a problem today.');
+                              }}
+                              className="p-1.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white transition-colors"
+                              title="Notify User"
+                            >
+                              <Mail className="w-4 h-4" />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -382,6 +394,15 @@ const AdminDashboard = () => {
           </div>
         </div>
       )}
+
+      {/* User Progress Calendar Inspection Modal */}
+      {inspectingUser && (
+        <UserCalendarModal
+          user={inspectingUser}
+          onClose={() => setInspectingUser(null)}
+        />
+      )}
+
 
       {/* Modal: Add Student to Batch */}
       {showAddModal && (

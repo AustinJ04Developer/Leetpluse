@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
-import { Trophy, Flame, Award, Globe, Users, Building2, Filter } from 'lucide-react';
+import { Trophy, Flame, Award, Globe, Users, Building2, Filter, Calendar } from 'lucide-react';
 import UserAvatar from '../../components/UserAvatar';
+import UserCalendarModal from '../../components/UserCalendarModal';
 
 const GlobalLeaderboard = () => {
   const { user } = useAuth();
@@ -10,9 +11,11 @@ const GlobalLeaderboard = () => {
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('all');
   const [loading, setLoading] = useState(true);
+  const [inspectingUser, setInspectingUser] = useState(null);
 
   const roleLevel = user?.roleLevel || 1;
   const isManagementOversight = roleLevel >= 3;
+
 
   const loadGroups = async () => {
     if (isManagementOversight) {
@@ -102,6 +105,7 @@ const GlobalLeaderboard = () => {
                   <th className="py-3 px-4">Difficulty Breakdown</th>
                   <th className="py-3 px-4">Active Streak</th>
                   <th className="py-3 px-4 text-right">XP Points</th>
+                  <th className="py-3 px-4 text-center">Progress</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800/60 text-xs">
@@ -170,6 +174,16 @@ const GlobalLeaderboard = () => {
                       <td className="py-3.5 px-4 text-right font-extrabold text-indigo-400 text-sm">
                         {(u.xp || 0).toLocaleString()} XP
                       </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          onClick={() => setInspectingUser(u)}
+                          className="px-2.5 py-1 rounded-xl bg-indigo-600/10 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-600 hover:text-white transition-all text-xs font-semibold flex items-center gap-1.5 mx-auto"
+                          title="View Daily Progress Calendar"
+                        >
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>Calendar</span>
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -178,6 +192,15 @@ const GlobalLeaderboard = () => {
           </div>
         )}
       </div>
+
+      {/* User Progress Calendar Inspection Modal */}
+      {inspectingUser && (
+        <UserCalendarModal
+          user={inspectingUser}
+          onClose={() => setInspectingUser(null)}
+        />
+      )}
+
     </div>
   );
 };
