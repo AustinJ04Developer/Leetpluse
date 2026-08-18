@@ -5,7 +5,6 @@ import { useSocket } from '../../context/SocketContext';
 import api from '../../services/api';
 import StatCard from '../../components/StatCard';
 import ContributionHeatmap from '../../components/ContributionHeatmap';
-import DailyProgressCalendar from '../../components/DailyProgressCalendar';
 import TopicRadarChart from '../../components/TopicRadarChart';
 
 import { 
@@ -297,9 +296,6 @@ const UserDashboard = () => {
           </div>
         </div>
       )}
-
-      {/* Daily Progress Interactive Calendar */}
-      <DailyProgressCalendar />
 
       {/* 365-Day Contribution Heatmap */}
       <ContributionHeatmap submissionLogs={heatmapLogs} />

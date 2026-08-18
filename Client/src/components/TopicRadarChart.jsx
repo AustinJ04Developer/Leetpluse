@@ -28,7 +28,7 @@ const TopicRadarChart = ({ topicMastery = [] }) => {
           <RadarChart cx="50%" cy="50%" outerRadius="75%" data={data}>
             <PolarGrid stroke="#1f2937" />
             <PolarAngleAxis dataKey="subject" stroke="#94a3b8" tick={{ fill: '#94a3b8', fontSize: 11 }} />
-            <PolarRadiusAxis angle={30} domain={[0, 'auto']} stroke="#475569" />
+            <PolarRadiusAxis tick={false} axisLine={false} />
             <Radar name="Solved Problems" dataKey="Solved" stroke="#6366f1" fill="#6366f1" fillOpacity={0.4} />
             <Tooltip contentStyle={{ backgroundColor: '#111827', borderColor: '#374151', borderRadius: '0.75rem', color: '#fff' }} />
           </RadarChart>

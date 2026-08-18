@@ -16,13 +16,13 @@ const UserCalendarModal = ({ user, onClose }) => {
             </div>
             <div>
               <h3 className="text-base sm:text-lg font-extrabold text-white flex items-center gap-2 flex-wrap">
-                <span>{user.name || 'User Progress Calendar'}</span>
+                <span>{user.name || 'User Daily Progress'}</span>
                 <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-mono font-normal">
                   @{user.leetcodeUsername || 'unlinked'}
                 </span>
               </h3>
               <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5">
-                Oversight Inspection — Daily problem submission calendar & activity heatmap
+                Oversight Inspection — Daily problem submission logs & activity analysis
               </p>
             </div>
           </div>
@@ -35,11 +35,10 @@ const UserCalendarModal = ({ user, onClose }) => {
           </button>
         </div>
 
-        {/* Embedded DailyProgressCalendar for target userId */}
+        {/* Embedded Daily Progress List view with Date Filter */}
         <DailyProgressCalendar userId={user._id || user.id} />
       </div>
     </div>
-
   );
 };
 
