@@ -59,15 +59,13 @@ const UserProgressPage = () => {
   }, [selectedGroupId]);
 
   const loadGroups = async () => {
-    if (isSuperAdmin) {
-      try {
-        const res = await api.get('/admin/group-overview');
-        if (res.data.success) {
-          setGroups(res.data.groups || []);
-        }
-      } catch (err) {
-        console.error('Error loading group overview:', err);
+    try {
+      const res = await api.get('/admin/group-overview');
+      if (res.data.success) {
+        setGroups(res.data.groups || []);
       }
+    } catch (err) {
+      // Non-critical if user doesn't have admin route access
     }
   };
 
@@ -317,22 +315,20 @@ const UserProgressPage = () => {
 
             {/* Batch Filter & Search */}
             <div className="flex flex-wrap items-center gap-3">
-              {isSuperAdmin && (
-                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
-                  <Filter className="w-3.5 h-3.5 text-indigo-400" />
-                  <span className="font-semibold text-slate-400">Batch:</span>
-                  <select
-                    value={selectedGroupId}
-                    onChange={(e) => setSelectedGroupId(e.target.value)}
-                    className="bg-transparent font-bold text-white outline-none cursor-pointer"
-                  >
-                    <option value="all" className="bg-slate-900">All Batches</option>
-                    {groups.map(g => (
-                      <option key={g._id} value={g._id} className="bg-slate-900">{g.name}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+                <Filter className="w-3.5 h-3.5 text-indigo-400" />
+                <span className="font-semibold text-slate-400">Batch:</span>
+                <select
+                  value={selectedGroupId}
+                  onChange={(e) => setSelectedGroupId(e.target.value)}
+                  className="bg-transparent font-bold text-white outline-none cursor-pointer"
+                >
+                  <option value="all" className="bg-slate-900">All Members (Org-Wide)</option>
+                  {groups.map(g => (
+                    <option key={g._id} value={g._id} className="bg-slate-900">{g.name}</option>
+                  ))}
+                </select>
+              </div>
 
               <div className="relative w-56">
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />

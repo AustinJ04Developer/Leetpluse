@@ -153,7 +153,7 @@ const DailyProgressCalendar = ({ userId, initialLogs = null }) => {
               </span>
             </h2>
             <p className="text-xs text-slate-400">
-              Detailed problem submissions breakdown per date from LeetCode
+              Detailed newly solved problems breakdown per date from LeetCode
             </p>
           </div>
         </div>
@@ -373,7 +373,7 @@ const DailyProgressCalendar = ({ userId, initialLogs = null }) => {
                   <div className="p-3 bg-slate-950/80 border-t border-slate-800 space-y-2">
                     <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1.5 mb-2">
                       <FileCode className="w-3.5 h-3.5 text-indigo-400" />
-                      <span>Problems Solved on {log.date} ({subsList.length} submissions)</span>
+                      <span>Newly Solved Problems on {log.date} ({subsList.length} newly solved)</span>
                     </div>
 
                     <div className="space-y-1.5">

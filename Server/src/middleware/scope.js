@@ -31,19 +31,10 @@ const getLeaderboardFilter = (requester, requestedGroupId) => {
     role: { $ne: 'superadmin' } 
   };
 
-  if (requester.roleLevel === 1 || requester.roleLevel === 2) {
-    // User & Admin are strictly locked to their own batch
-    if (requester.groupId) {
-      userFilter.groupId = requester.groupId;
-    }
-  } else if (requester.roleLevel >= 3) {
-    // SuperAdmin & DevAdmin can filter batch-by-batch or view org-wide
-    if (requestedGroupId && requestedGroupId !== 'all') {
-      userFilter.groupId = requestedGroupId;
-    }
-    if (requester.orgId) {
-      userFilter.orgId = requester.orgId;
-    }
+  if (requestedGroupId && requestedGroupId !== 'all') {
+    userFilter.groupId = requestedGroupId;
+  } else if (requester.orgId) {
+    userFilter.orgId = requester.orgId;
   }
 
   return userFilter;

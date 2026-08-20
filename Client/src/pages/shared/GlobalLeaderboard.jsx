@@ -16,15 +16,13 @@ const GlobalLeaderboard = () => {
 
 
   const loadGroups = async () => {
-    if (isManagementOversight) {
-      try {
-        const res = await api.get('/admin/group-overview');
-        if (res.data.success) {
-          setGroups(res.data.groups || []);
-        }
-      } catch (err) {
-        console.error(err);
+    try {
+      const res = await api.get('/admin/group-overview');
+      if (res.data.success) {
+        setGroups(res.data.groups || []);
       }
+    } catch (err) {
+      // Non-critical if user doesn't have admin route access
     }
   };
 
@@ -32,7 +30,7 @@ const GlobalLeaderboard = () => {
     setLoading(true);
     try {
       let url = '/leetcode/leaderboard';
-      if (isManagementOversight && selectedGroupId !== 'all') {
+      if (selectedGroupId && selectedGroupId !== 'all') {
         url += `?groupId=${selectedGroupId}`;
       }
       const res = await api.get(url);
@@ -59,33 +57,28 @@ const GlobalLeaderboard = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-white">
-            {!isManagementOversight ? 'My Batch Leaderboard' : 'Batch Leaderboards'}
+            Global Leaderboard
           </h1>
           <p className="text-xs text-slate-400">
-            {!isManagementOversight 
-              ? 'Standings for your assigned cohort batch ranked by total solved & streak'
-              : 'Inspect student standings batch-by-batch across organization cohorts'
-            }
+            Standings for all programmers ranked by total solved, difficulty breakdown & streak
           </p>
         </div>
 
-        {/* Batch Selector for SuperAdmin & DevAdmin */}
-        {isManagementOversight && (
-          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
-            <Filter className="w-4 h-4 text-indigo-400 ml-2" />
-            <span className="text-xs font-semibold text-slate-300">Select Batch:</span>
-            <select
-              value={selectedGroupId}
-              onChange={(e) => setSelectedGroupId(e.target.value)}
-              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-white outline-none focus:border-indigo-500"
-            >
-              <option value="all">All Batches (Org-Wide)</option>
-              {groups.map(g => (
-                <option key={g._id} value={g._id}>{g.name}</option>
-              ))}
-            </select>
-          </div>
-        )}
+        {/* Batch Selector */}
+        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
+          <Filter className="w-4 h-4 text-indigo-400 ml-2" />
+          <span className="text-xs font-semibold text-slate-300">Select Batch:</span>
+          <select
+            value={selectedGroupId}
+            onChange={(e) => setSelectedGroupId(e.target.value)}
+            className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-white outline-none focus:border-indigo-500"
+          >
+            <option value="all">All Members (Org-Wide)</option>
+            {groups.map(g => (
+              <option key={g._id} value={g._id}>{g.name}</option>
+            ))}
+          </select>
+        </div>
       </div>
 
       <div className="glass-card rounded-3xl p-6 border border-slate-800 space-y-4">

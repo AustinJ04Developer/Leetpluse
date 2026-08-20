@@ -247,40 +247,44 @@ const syncUserLeetCode = async (user) => {
     }
     await leetStat.save();
 
-    // 3. Populate REAL Date-Wise Submission Logs with Problem Submissions Array
+    // 3. Populate REAL Date-Wise Submission Logs with ONLY Newly Solved Problems per Date
     if (submissionCalendarMap && Object.keys(submissionCalendarMap).length > 0) {
       const easyRatio = statData.totalSolved > 0 ? statData.easySolved / statData.totalSolved : 0.5;
       const mediumRatio = statData.totalSolved > 0 ? statData.mediumSolved / statData.totalSolved : 0.35;
-      const allCatalog = [...PROBLEM_CATALOG.Easy, ...PROBLEM_CATALOG.Medium, ...PROBLEM_CATALOG.Hard];
 
-      const logOps = Object.entries(submissionCalendarMap).map(([tsStr, count]) => {
+      // Sort calendar entries chronologically (oldest to newest) to correctly identify first-time solved problems
+      const sortedEntries = Object.entries(submissionCalendarMap).sort((a, b) => parseInt(a[0], 10) - parseInt(b[0], 10));
+      const seenTitleSlugs = new Set();
+
+      const logOps = sortedEntries.map(([tsStr, rawCount]) => {
         const tsNum = parseInt(tsStr, 10);
         const dateObj = new Date(tsNum * (tsStr.length === 10 ? 1000 : 1));
         const dateStr = dateObj.toISOString().split('T')[0];
 
-        const easy = Math.floor(count * easyRatio);
-        const medium = Math.floor(count * mediumRatio);
-        const hard = Math.max(0, count - easy - medium);
-
-        // Get actual submissions for this date if present, or supplement from catalog
-        let dateSubmissions = submissionsByDate[dateStr] || [];
+        // Get actual AC submissions for this date
+        const rawDateSubs = submissionsByDate[dateStr] || [];
         
-        if (dateSubmissions.length < count) {
-          const needed = count - dateSubmissions.length;
-          let hash = 0;
-          for (let i = 0; i < dateStr.length; i++) hash += dateStr.charCodeAt(i);
-
-          for (let i = 0; i < needed; i++) {
-            const idx = (hash + i * 13) % allCatalog.length;
-            const p = allCatalog[idx];
-            dateSubmissions.push({
-              title: p.title,
-              titleSlug: p.titleSlug,
-              difficulty: p.difficulty,
-              status: 'Accepted',
-              timestamp: dateObj
-            });
+        // Filter to ONLY newly solved problems (solved for the first time on this date)
+        const newlySolvedSubs = [];
+        rawDateSubs.forEach(sub => {
+          if (!seenTitleSlugs.has(sub.titleSlug)) {
+            seenTitleSlugs.add(sub.titleSlug);
+            newlySolvedSubs.push(sub);
           }
+        });
+
+        // Determine solved counts for this date
+        let count = rawCount;
+        let easy = Math.floor(rawCount * easyRatio);
+        let medium = Math.floor(rawCount * mediumRatio);
+        let hard = Math.max(0, rawCount - easy - medium);
+
+        // If we have actual newly solved submissions recorded, use their exact counts
+        if (newlySolvedSubs.length > 0) {
+          count = newlySolvedSubs.length;
+          easy = newlySolvedSubs.filter(s => s.difficulty === 'Easy').length;
+          medium = newlySolvedSubs.filter(s => s.difficulty === 'Medium').length;
+          hard = newlySolvedSubs.filter(s => s.difficulty === 'Hard').length;
         }
 
         return {
@@ -293,7 +297,7 @@ const syncUserLeetCode = async (user) => {
               easy, 
               medium, 
               hard,
-              submissions: dateSubmissions
+              submissions: newlySolvedSubs
             },
             upsert: true
           }

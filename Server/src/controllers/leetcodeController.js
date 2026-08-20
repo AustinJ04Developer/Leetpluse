@@ -138,8 +138,7 @@ const getLeaderboard = async (req, res) => {
 
     const leaderboard = await LeetCodeStat.find({ userId: { $in: eligibleUserIds } })
       .populate('userId', 'name email avatar role leetcodeUsername xp level groupId')
-      .sort({ totalSolved: -1 })
-      .limit(50);
+      .sort({ totalSolved: -1, easySolved: -1, mediumSolved: -1, hardSolved: -1 });
 
     res.json({ 
       success: true, 
@@ -158,18 +157,10 @@ const getBatchProgressMatrix = async (req, res) => {
 
     let userQuery = { role: { $ne: 'superadmin' } };
 
-    if (requester.roleLevel === 1) { // User: cohort peers
-      if (requester.groupId) {
-        userQuery.groupId = requester.groupId;
-      } else {
-        userQuery._id = requester._id;
-      }
-    } else if (requester.roleLevel === 2) { // Admin: assigned batch
-      if (requester.groupId) {
-        userQuery.groupId = requester.groupId;
-      }
-    } else if (requester.roleLevel >= 3 && groupId && groupId !== 'all') {
+    if (groupId && groupId !== 'all') {
       userQuery.groupId = groupId;
+    } else if (requester.orgId) {
+      userQuery.orgId = requester.orgId;
     }
 
     const users = await User.find(userQuery)
