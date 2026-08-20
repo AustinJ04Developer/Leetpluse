@@ -1,5 +1,36 @@
 const WeeklyProblem = require('../models/WeeklyProblem');
 const User = require('../models/User');
+const { getQuestionDetails } = require('../services/leetcodeService');
+
+// Helper to fetch problem details from LeetCode URL for auto-filling Admin forms
+const fetchProblemDetailsFromUrl = async (req, res) => {
+  try {
+    const { url } = req.query;
+    if (!url) {
+      return res.status(400).json({ success: false, message: 'URL is required' });
+    }
+
+    const match = url.match(/leetcode\.com\/problems\/([^/]+)/);
+    const titleSlug = match ? match[1] : url.trim().toLowerCase().replace(/\s+/g, '-');
+
+    const details = await getQuestionDetails(titleSlug);
+    
+    const formattedTitle = titleSlug
+      .split('-')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ');
+
+    res.json({
+      success: true,
+      titleSlug,
+      title: formattedTitle,
+      difficulty: details.difficulty,
+      category: details.topicTags && details.topicTags[0] ? details.topicTags[0] : 'General'
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
 
 // Helper to get ISO week number & year
 const getISOWeekDetails = (d = new Date()) => {
@@ -275,5 +306,6 @@ module.exports = {
   updateWeeklyProblem,
   deleteWeeklyProblem,
   toggleCompletion,
-  getAvailableWeeks
+  getAvailableWeeks,
+  fetchProblemDetailsFromUrl
 };

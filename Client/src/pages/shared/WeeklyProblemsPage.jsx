@@ -172,6 +172,28 @@ const WeeklyProblemsPage = () => {
     }
   };
 
+  const [fetchingDetails, setFetchingDetails] = useState(false);
+
+  const handleUrlBlur = async (urlVal) => {
+    if (!urlVal || !urlVal.includes('leetcode.com/problems/')) return;
+    try {
+      setFetchingDetails(true);
+      const res = await api.get(`/weekly-problems/fetch-details?url=${encodeURIComponent(urlVal)}`);
+      if (res.data.success) {
+        setFormData(prev => ({
+          ...prev,
+          title: prev.title.trim() === '' ? res.data.title : prev.title,
+          difficulty: res.data.difficulty || prev.difficulty,
+          category: (!prev.category || prev.category === 'Arrays & Hashing') ? res.data.category : prev.category
+        }));
+      }
+    } catch (err) {
+      console.error('Failed to auto-fetch LeetCode details:', err);
+    } finally {
+      setFetchingDetails(false);
+    }
+  };
+
   const handleDeleteProblem = async (problemId) => {
     if (!window.confirm('Are you sure you want to delete this weekly problem?')) return;
     try {
@@ -452,14 +474,22 @@ const WeeklyProblemsPage = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider mb-1">
-                  LeetCode Problem URL *
-                </label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-bold text-slate-300 uppercase tracking-wider">
+                    LeetCode Problem URL *
+                  </label>
+                  {fetchingDetails && (
+                    <span className="text-[11px] text-indigo-400 animate-pulse flex items-center gap-1">
+                      <Sparkles className="w-3 h-3" /> Auto-detecting difficulty...
+                    </span>
+                  )}
+                </div>
                 <input
                   type="url"
                   placeholder="https://leetcode.com/problems/two-sum/"
                   value={formData.problemUrl}
                   onChange={(e) => setFormData({ ...formData, problemUrl: e.target.value })}
+                  onBlur={(e) => handleUrlBlur(e.target.value)}
                   className="w-full bg-slate-900 border border-slate-800 text-slate-100 text-sm rounded-xl px-3.5 py-2.5 focus:outline-none focus:border-indigo-500"
                   required
                 />

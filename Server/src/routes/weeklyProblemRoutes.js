@@ -7,11 +7,13 @@ const {
   updateWeeklyProblem,
   deleteWeeklyProblem,
   toggleCompletion,
-  getAvailableWeeks
+  getAvailableWeeks,
+  fetchProblemDetailsFromUrl
 } = require('../controllers/weeklyProblemController');
 
 router.get('/', protect, getWeeklyProblems);
 router.get('/weeks', protect, getAvailableWeeks);
+router.get('/fetch-details', protect, fetchProblemDetailsFromUrl);
 router.post('/', protect, createWeeklyProblem);
 router.put('/:id', protect, updateWeeklyProblem);
 router.delete('/:id', protect, deleteWeeklyProblem);

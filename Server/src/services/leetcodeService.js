@@ -33,6 +33,65 @@ const PROBLEM_CATALOG = {
   ]
 };
 
+const problemDetailsCache = new Map();
+
+// Seed cache with PROBLEM_CATALOG entries
+[...PROBLEM_CATALOG.Easy, ...PROBLEM_CATALOG.Medium, ...PROBLEM_CATALOG.Hard].forEach(p => {
+  problemDetailsCache.set(p.titleSlug, {
+    difficulty: p.difficulty,
+    topicTags: p.topicTags
+  });
+});
+
+/**
+ * Fetches authentic problem details (difficulty & topicTags) from LeetCode GraphQL
+ */
+const getQuestionDetails = async (titleSlug) => {
+  if (problemDetailsCache.has(titleSlug)) {
+    return problemDetailsCache.get(titleSlug);
+  }
+
+  const query = `
+    query getQuestionDetail($titleSlug: String!) {
+      question(titleSlug: $titleSlug) {
+        difficulty
+        topicTags {
+          name
+        }
+      }
+    }
+  `;
+
+  try {
+    const res = await fetch('https://leetcode.com/graphql', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Referer': `https://leetcode.com/problems/${titleSlug}/`,
+        'Origin': 'https://leetcode.com'
+      },
+      body: JSON.stringify({ query, variables: { titleSlug } })
+    }).then(r => r.json());
+
+    const question = res?.data?.question;
+    if (question && question.difficulty) {
+      const details = {
+        difficulty: question.difficulty,
+        topicTags: question.topicTags?.map(t => t.name) || ['Algorithms']
+      };
+      problemDetailsCache.set(titleSlug, details);
+      return details;
+    }
+  } catch (err) {
+    console.error(`[LeetCode Question Detail Fetch Error] Failed for ${titleSlug}:`, err);
+  }
+
+  const fallback = { difficulty: 'Medium', topicTags: ['Algorithms', 'Data Structures'] };
+  problemDetailsCache.set(titleSlug, fallback);
+  return fallback;
+};
+
 /**
  * Executes separate LeetCode GraphQL queries in parallel for authentic, live data
  */
@@ -86,17 +145,30 @@ const fetchRealLeetCodeData = async (username) => {
     }
   `;
 
+  const tagQuery = `
+    query userProblemsSolvedByTag($username: String!) {
+      matchedUser(username: $username) {
+        tagProblemCounts {
+          advanced { tagName tagSlug problemsSolved }
+          intermediate { tagName tagSlug problemsSolved }
+          fundamental { tagName tagSlug problemsSolved }
+        }
+      }
+    }
+  `;
+
   try {
-    const [resProfile, resRecent, resCalendar] = await Promise.all([
+    const [resProfile, resRecent, resCalendar, resTag] = await Promise.all([
       fetch('https://leetcode.com/graphql', { method: 'POST', headers, body: JSON.stringify({ query: profileQuery, variables: { username } }) }).then(r => r.json()).catch(() => null),
       fetch('https://leetcode.com/graphql', { method: 'POST', headers, body: JSON.stringify({ query: recentQuery, variables: { username, limit: 30 } }) }).then(r => r.json()).catch(() => null),
-      fetch('https://leetcode.com/graphql', { method: 'POST', headers, body: JSON.stringify({ query: calendarQuery, variables: { username } }) }).then(r => r.json()).catch(() => null)
+      fetch('https://leetcode.com/graphql', { method: 'POST', headers, body: JSON.stringify({ query: calendarQuery, variables: { username } }) }).then(r => r.json()).catch(() => null),
+      fetch('https://leetcode.com/graphql', { method: 'POST', headers, body: JSON.stringify({ query: tagQuery, variables: { username } }) }).then(r => r.json()).catch(() => null)
     ]);
 
-    return { resProfile, resRecent, resCalendar };
+    return { resProfile, resRecent, resCalendar, resTag };
   } catch (err) {
     console.error(`[LeetCode Fetch Error] Failed for ${username}:`, err);
-    return { resProfile: null, resRecent: null, resCalendar: null };
+    return { resProfile: null, resRecent: null, resCalendar: null, resTag: null };
   }
 };
 
@@ -113,7 +185,7 @@ const syncUserLeetCode = async (user) => {
   await user.save();
 
   try {
-    const { resProfile, resRecent, resCalendar } = await fetchRealLeetCodeData(username);
+    const { resProfile, resRecent, resCalendar, resTag } = await fetchRealLeetCodeData(username);
 
     let statData = null;
     let fetchedRecentSubs = [];
@@ -158,12 +230,16 @@ const syncUserLeetCode = async (user) => {
       };
     }
 
-    // 2. Process Recent Submissions and map them by date string
+    // 2. Process Recent Submissions and map them by date string with exact LeetCode difficulty
     if (resRecent?.data?.recentAcSubmissionList?.length > 0) {
-      const allCatalog = [...PROBLEM_CATALOG.Easy, ...PROBLEM_CATALOG.Medium, ...PROBLEM_CATALOG.Hard];
-      
-      resRecent.data.recentAcSubmissionList.forEach(sub => {
-        const match = allCatalog.find(p => p.titleSlug === sub.titleSlug);
+      const recentList = resRecent.data.recentAcSubmissionList;
+      const uniqueSlugs = [...new Set(recentList.map(s => s.titleSlug))];
+
+      // Fetch authentic problem details (difficulty, topicTags) from LeetCode GraphQL in parallel
+      await Promise.all(uniqueSlugs.map(slug => getQuestionDetails(slug)));
+
+      recentList.forEach(sub => {
+        const details = problemDetailsCache.get(sub.titleSlug) || { difficulty: 'Medium', topicTags: ['Algorithms', 'Data Structures'] };
         const tsNum = parseInt(sub.timestamp, 10);
         const dateObj = new Date(tsNum * (sub.timestamp.toString().length === 10 ? 1000 : 1));
         const dateStr = dateObj.toISOString().split('T')[0];
@@ -171,10 +247,10 @@ const syncUserLeetCode = async (user) => {
         const item = {
           title: sub.title,
           titleSlug: sub.titleSlug,
-          difficulty: match ? match.difficulty : 'Medium',
+          difficulty: details.difficulty,
           status: 'Accepted',
           timestamp: dateObj,
-          topicTags: match ? match.topicTags : ['Algorithms', 'Data Structures']
+          topicTags: details.topicTags
         };
 
         fetchedRecentSubs.push(item);
@@ -218,13 +294,43 @@ const syncUserLeetCode = async (user) => {
       user.avatar = userAvatarUrl;
     }
 
-    const topicMastery = [
+    // Calculate Topic Mastery from real LeetCode tagProblemCounts
+    let topicMastery = [
       { topic: 'Arrays & Strings', solved: Math.floor(statData.easySolved * 0.6), total: 120 },
       { topic: 'Dynamic Programming', solved: Math.floor(statData.mediumSolved * 0.4), total: 90 },
       { topic: 'Trees & Graphs', solved: Math.floor(statData.mediumSolved * 0.35), total: 80 },
       { topic: 'Two Pointers & Sliding Window', solved: Math.floor(statData.easySolved * 0.3), total: 50 },
       { topic: 'Math & Bit Manipulation', solved: Math.floor(statData.hardSolved * 0.5), total: 40 }
     ];
+
+    if (resTag?.data?.matchedUser?.tagProblemCounts) {
+      const tags = resTag.data.matchedUser.tagProblemCounts;
+      const allTags = [
+        ...(tags.fundamental || []),
+        ...(tags.intermediate || []),
+        ...(tags.advanced || [])
+      ];
+
+      const getTagCount = (slugs) => {
+        return allTags
+          .filter(t => slugs.includes(t.tagSlug))
+          .reduce((sum, t) => sum + (t.problemsSolved || 0), 0);
+      };
+
+      const arrStr = getTagCount(['array', 'string', 'hash-table']);
+      const dp = getTagCount(['dynamic-programming', 'memoization']);
+      const treesGraph = getTagCount(['tree', 'binary-tree', 'graph', 'depth-first-search', 'breadth-first-search']);
+      const pointersWindow = getTagCount(['two-pointers', 'sliding-window']);
+      const mathBit = getTagCount(['math', 'bit-manipulation']);
+
+      topicMastery = [
+        { topic: 'Arrays & Strings', solved: arrStr, total: Math.max(arrStr + 20, 120) },
+        { topic: 'Dynamic Programming', solved: dp, total: Math.max(dp + 15, 90) },
+        { topic: 'Trees & Graphs', solved: treesGraph, total: Math.max(treesGraph + 15, 80) },
+        { topic: 'Two Pointers & Sliding Window', solved: pointersWindow, total: Math.max(pointersWindow + 10, 50) },
+        { topic: 'Math & Bit Manipulation', solved: mathBit, total: Math.max(mathBit + 10, 40) }
+      ];
+    }
 
     let leetStat = await LeetCodeStat.findOne({ userId: user._id });
     if (!leetStat) {
@@ -328,4 +434,4 @@ const syncUserLeetCode = async (user) => {
   }
 };
 
-module.exports = { syncUserLeetCode, fetchRealLeetCodeData };
+module.exports = { syncUserLeetCode, fetchRealLeetCodeData, getQuestionDetails };
