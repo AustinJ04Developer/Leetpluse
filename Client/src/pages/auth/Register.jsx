@@ -7,9 +7,10 @@ import api from '../../services/api';
 const Register = () => {
   const [activeTab, setActiveTab] = useState('student'); // 'student' | 'institution'
   
-  // Common Options
+  // Dynamic Options Loaded from Server
   const [institutions, setInstitutions] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [academicYears, setAcademicYears] = useState([]);
   const [batches, setBatches] = useState([]);
   const [sections, setSections] = useState([]);
 
@@ -21,9 +22,25 @@ const Register = () => {
   const [registerNumber, setRegisterNumber] = useState('');
   const [studentId, setStudentId] = useState('');
   const [institutionId, setInstitutionId] = useState('');
+  
+  // Dual Select/Type Fields
   const [departmentId, setDepartmentId] = useState('');
+  const [departmentCustom, setDepartmentCustom] = useState('');
+
+  const [academicYearId, setAcademicYearId] = useState('');
+  const [academicYearCustom, setAcademicYearCustom] = useState('');
+
   const [batchId, setBatchId] = useState('');
+  const [batchCustom, setBatchCustom] = useState('');
+
   const [sectionId, setSectionId] = useState('');
+  const [sectionCustom, setSectionCustom] = useState('');
+
+  const [yearLevel, setYearLevel] = useState(1);
+  const [semester, setSemester] = useState(1);
+
+  const [academicStatus, setAcademicStatus] = useState('Pursuing');
+  const [cohortCustom, setCohortCustom] = useState(''); // Optional!
 
   // Institution Form State
   const [instName, setInstName] = useState('');
@@ -43,28 +60,30 @@ const Register = () => {
   const { refreshUser } = useAuth();
   const navigate = useNavigate();
 
-  useEffect(() => {
-    api.get('/institutions')
+  // Load registration options for chosen institution
+  const fetchRegistrationOptions = (targetInstId) => {
+    const query = targetInstId ? `?institutionId=${targetInstId}` : '';
+    api.get(`/auth/registration-options${query}`)
       .then(res => {
-        if (res.data.success && res.data.data.length > 0) {
-          setInstitutions(res.data.data);
-          setInstitutionId(res.data.data[0]._id);
+        if (res.data.success && res.data.data) {
+          const { institutions: insts, selectedInstitutionId, departments: depts, academicYears: years, batches: bts, sections: secs } = res.data.data;
+          setInstitutions(insts || []);
+          if (!institutionId && selectedInstitutionId) {
+            setInstitutionId(selectedInstitutionId);
+          }
+          setDepartments(depts || []);
+          setAcademicYears(years || []);
+          setBatches(bts || []);
+          setSections(secs || []);
         }
       })
-      .catch(err => console.error(err));
-  }, []);
+      .catch(err => {
+        console.error('Error fetching registration options:', err);
+      });
+  };
 
   useEffect(() => {
-    if (!institutionId) return;
-    Promise.all([
-      api.get(`/institutions/departments/list?institutionId=${institutionId}`),
-      api.get(`/institutions/batches/list?institutionId=${institutionId}`),
-      api.get(`/institutions/sections/list?institutionId=${institutionId}`)
-    ]).then(([dRes, bRes, sRes]) => {
-      if (dRes.data.success) setDepartments(dRes.data.data);
-      if (bRes.data.success) setBatches(bRes.data.data);
-      if (sRes.data.success) setSections(sRes.data.data);
-    }).catch(err => console.error(err));
+    fetchRegistrationOptions(institutionId);
   }, [institutionId]);
 
   const handleStudentSubmit = async (e) => {
@@ -73,18 +92,59 @@ const Register = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/register', {
+      if (!name || !email || !password || !registerNumber || !studentId || !leetcodeUsername) {
+        setError('All registration fields (Full Name, Email, Password, Register No, Student ID, LeetCode Username) are required.');
+        setLoading(false);
+        return;
+      }
+
+      if (!departmentId || (departmentId === '__custom__' && !departmentCustom.trim())) {
+        setError('Please select or type your Department.');
+        setLoading(false);
+        return;
+      }
+
+      if (!academicYearId || (academicYearId === '__custom__' && !academicYearCustom.trim())) {
+        setError('Please select or type your Academic Year.');
+        setLoading(false);
+        return;
+      }
+
+      if (!batchId || (batchId === '__custom__' && !batchCustom.trim())) {
+        setError('Please select or type your Academic Batch.');
+        setLoading(false);
+        return;
+      }
+
+      const isCustomDept = departmentId === '__custom__';
+      const isCustomYear = academicYearId === '__custom__';
+      const isCustomBatch = batchId === '__custom__';
+      const isCustomSection = sectionId === '__custom__';
+
+      const payload = {
         name,
         email,
         password,
         leetcodeUsername,
         institutionId,
-        departmentId,
-        batchId,
-        sectionId,
+        departmentId: isCustomDept ? '' : departmentId,
+        departmentCustom: isCustomDept ? departmentCustom : '',
+        academicYearId: isCustomYear ? '' : academicYearId,
+        academicYearCustom: isCustomYear ? academicYearCustom : '',
+        batchId: isCustomBatch ? '' : batchId,
+        batchCustom: isCustomBatch ? batchCustom : '',
+        academicBatch: isCustomBatch ? batchCustom : '',
+        sectionId: isCustomSection ? '' : sectionId,
+        sectionCustom: isCustomSection ? sectionCustom : '',
+        yearLevel: Number(yearLevel),
+        semester: Number(semester),
+        academicStatus,
+        cohortCustom, // Optional!
         registerNumber,
         studentId
-      });
+      };
+
+      const res = await api.post('/auth/register', payload);
 
       if (res.data.success) {
         localStorage.setItem('token', res.data.token);
@@ -215,6 +275,7 @@ const Register = () => {
                   <Hash className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                   <input
                     type="text"
+                    required
                     placeholder="e.g. 961421104001"
                     value={registerNumber}
                     onChange={(e) => setRegisterNumber(e.target.value)}
@@ -224,9 +285,10 @@ const Register = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Student ID (Optional)</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Student ID</label>
                 <input
                   type="text"
+                  required
                   placeholder="e.g. STU-2026-01"
                   value={studentId}
                   onChange={(e) => setStudentId(e.target.value)}
@@ -235,7 +297,7 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Institution Hierarchy Selectors */}
+            {/* Institution / College Selection */}
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Institution / College</label>
               <select
@@ -243,62 +305,212 @@ const Register = () => {
                 onChange={(e) => setInstitutionId(e.target.value)}
                 className="w-full px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-sm text-white outline-none focus:border-indigo-500"
               >
+                <option value="">Select Institution</option>
                 {institutions.map(inst => (
                   <option key={inst._id} value={inst._id}>{inst.name} ({inst.code})</option>
                 ))}
               </select>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            {/* Dual Select / Type: Department & Academic Year */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Department */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Department</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Department</span>
+                  <span className="text-[10px] text-indigo-400 font-normal">Select or Type</span>
+                </label>
                 <select
                   value={departmentId}
                   onChange={(e) => setDepartmentId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500"
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 mb-1.5"
                 >
-                  <option value="">Select Dept</option>
+                  <option value="">Select Department</option>
                   {departments.map(d => (
                     <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
                   ))}
+                  <option value="__custom__">＋ Type Custom / New Dept</option>
+                </select>
+                {departmentId === '__custom__' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter Department (e.g. Computer Science)"
+                    value={departmentCustom}
+                    onChange={(e) => setDepartmentCustom(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-indigo-500/50 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-indigo-500 animate-fadeIn"
+                  />
+                )}
+              </div>
+
+              {/* Academic Year */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Academic Year</span>
+                  <span className="text-[10px] text-indigo-400 font-normal">Select or Type</span>
+                </label>
+                <select
+                  value={academicYearId}
+                  onChange={(e) => setAcademicYearId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 mb-1.5"
+                >
+                  <option value="">Select Academic Year</option>
+                  {academicYears.map(y => (
+                    <option key={y._id} value={y._id}>{y.displayName || y.yearLabel}</option>
+                  ))}
+                  <option value="__custom__">＋ Type Custom Academic Year</option>
+                </select>
+                {academicYearId === '__custom__' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter Year (e.g. 2026-2027 or 3rd Year)"
+                    value={academicYearCustom}
+                    onChange={(e) => setAcademicYearCustom(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-indigo-500/50 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-indigo-500 animate-fadeIn"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Academic Status & Academic Batch (4-Year Range) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Academic Status</label>
+                <select
+                  value={academicStatus}
+                  onChange={(e) => setAcademicStatus(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 font-medium"
+                >
+                  <option value="Pursuing">Pursuing</option>
+                  <option value="Graduated">Graduated</option>
                 </select>
               </div>
 
+              {/* Academic Batch (4 Years Range e.g. 2023 - 2027) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Batch</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Academic Batch (Degree 4-Year Range)</span>
+                  <span className="text-[10px] text-indigo-400 font-normal">Select or Type</span>
+                </label>
                 <select
                   value={batchId}
                   onChange={(e) => setBatchId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 mb-1.5"
+                >
+                  <option value="">Select Academic Batch</option>
+                  {batches.map(b => (
+                    <option key={b._id} value={b._id}>{b.name} ({b.cohortRange || 'Cohort'})</option>
+                  ))}
+                  <option value="__custom__">＋ Type Custom Batch (e.g. 2023 - 2027)</option>
+                </select>
+                {batchId === '__custom__' && (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter Batch Range (e.g. 2023 - 2027)"
+                    value={batchCustom}
+                    onChange={(e) => setBatchCustom(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-indigo-500/50 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-indigo-500 animate-fadeIn font-mono"
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* Section & Academic Cohort (Special Team / Group - OPTIONAL) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Section</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Optional</span>
+                </label>
+                <select
+                  value={sectionId}
+                  onChange={(e) => setSectionId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 mb-1.5"
+                >
+                  <option value="">Select Section</option>
+                  {sections.map(s => (
+                    <option key={s._id} value={s._id}>{s.name}</option>
+                  ))}
+                  <option value="__custom__">＋ Type Custom Section</option>
+                </select>
+                {sectionId === '__custom__' && (
+                  <input
+                    type="text"
+                    placeholder="Enter Section (e.g. Section A)"
+                    value={sectionCustom}
+                    onChange={(e) => setSectionCustom(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-indigo-500/50 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-indigo-500 animate-fadeIn"
+                  />
+                )}
+              </div>
+
+              {/* Academic Cohort (Special Training Team / Group - NOT MANDATORY) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Academic Cohort (Special Teams / Groups)</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Optional</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Elite Training Batch, MPM Batch (Optional)"
+                  value={cohortCustom}
+                  onChange={(e) => setCohortCustom(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-xs text-white placeholder-slate-500 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Mapped Year Level & Semester Selectors (1 Year = 2 Semesters Rule) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Year Level</label>
+                <select
+                  value={yearLevel}
+                  onChange={(e) => {
+                    const yr = Number(e.target.value);
+                    setYearLevel(yr);
+                    const minSem = (yr * 2) - 1;
+                    const maxSem = yr * 2;
+                    if (semester < minSem || semester > maxSem) {
+                      setSemester(minSem);
+                    }
+                  }}
                   className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500"
                 >
-                  <option value="">Select Batch</option>
-                  {batches.map(b => (
-                    <option key={b._id} value={b._id}>{b.name}</option>
-                  ))}
+                  <option value={1}>1st Year (Freshman)</option>
+                  <option value={2}>2nd Year (Sophomore)</option>
+                  <option value={3}>3rd Year (Pre-Final Year)</option>
+                  <option value={4}>4th Year (Final Year)</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Section</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Semester (Mapped to Year {yearLevel})</label>
                 <select
-                  value={sectionId}
-                  onChange={(e) => setSectionId(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500"
+                  value={semester}
+                  onChange={(e) => {
+                    const sem = Number(e.target.value);
+                    setSemester(sem);
+                    setYearLevel(Math.ceil(sem / 2));
+                  }}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500 font-mono"
                 >
-                  <option value="">No Section</option>
-                  {sections.map(s => (
-                    <option key={s._id} value={s._id}>{s.name}</option>
+                  {[((Number(yearLevel) || 1) * 2) - 1, (Number(yearLevel) || 1) * 2].map(sem => (
+                    <option key={sem} value={sem}>Semester {sem} (Year {Math.ceil(sem / 2)})</option>
                   ))}
                 </select>
               </div>
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">LeetCode Username (Optional)</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">LeetCode Username</label>
               <div className="relative">
                 <Code className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                 <input
                   type="text"
+                  required
                   value={leetcodeUsername}
                   onChange={(e) => setLeetcodeUsername(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-sm text-white placeholder-slate-500 outline-none font-mono"

@@ -69,6 +69,8 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const instAdminNav = [
     { name: 'Institution Overview', path: '/institution/dashboard', icon: Building2 },
+    { name: 'Institutional Leaderboard', path: '/leaderboard', icon: Trophy },
+    { name: 'Daily Progress & Heatmaps', path: '/user-progress', icon: Calendar },
     ...(hasLeetCode ? [{ name: 'My Personal Coding', path: '/dashboard', icon: Activity }] : []),
     { name: 'Academic Hierarchy', path: '/institution/hierarchy', icon: Layers },
     { name: 'Student Roster', path: '/admin/students', icon: GraduationCap },

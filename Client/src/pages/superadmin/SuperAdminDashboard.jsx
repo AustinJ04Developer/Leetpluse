@@ -130,8 +130,8 @@ const SuperAdminDashboard = () => {
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-2xl font-extrabold text-white tracking-tight">Executive Management Hub</h1>
-              <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
-                Level 3 SuperAdmin
+              <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">
+                Level 6 Developer & Super Administrator
               </span>
             </div>
             <p className="text-xs text-slate-400 mt-1">

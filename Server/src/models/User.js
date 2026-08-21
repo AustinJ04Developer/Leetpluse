@@ -10,8 +10,8 @@ const userSchema = new mongoose.Schema({
     default: 'student' 
   },
   roleLevel: { type: Number, enum: [1, 2, 3, 4, 5, 6], default: 1 },
-  // Level 6: SuperAdmin (Platform Lead / Global System)
-  // Level 5: Institution Admin (Institutional Manager / Principal)
+  // Level 6: Overall Developer & Super Administrator
+  // Level 5: Institutional Administrator (Institutional Manager / Principal)
   // Level 4: HOD (Head of Department)
   // Level 3: Faculty (Faculty Mentor / Batch Instructor)
   // Level 2: Student Representative (Class Representative / Student Lead)
@@ -33,7 +33,17 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   semester: { type: Number, default: 1 },
   yearLevel: { type: Number, enum: [1, 2, 3, 4], default: 1 }, // 1=1st Year, 2=2nd Year, 3=3rd Year (Pre-Final), 4=4th Year (Final)
-  academicBatch: { type: String, default: '' }, // e.g. "2023-2027" (Degree Cohort)
+  academicStatus: { type: String, enum: ['Pursuing', 'Graduated', 'Alumni', 'Discontinued'], default: 'Pursuing' },
+  academicBatch: { type: String, default: '' }, // e.g. "2023 - 2027" (Degree Batch 4-year range)
+  academicCohorts: [{ type: String }], // Optional special training teams/groups e.g. ["Elite Training Batch", "MPM Batch"]
+
+  // Role-specific professional & social fields
+  designation: { type: String, default: '' }, // e.g. "Professor & Head", "Principal", "Student Lead"
+  specialization: { type: String, default: '' }, // e.g. "AI & Machine Learning", "Data Structures"
+  officeLocation: { type: String, default: '' }, // e.g. "Room 304, IT Block"
+  githubUrl: { type: String, default: '' },
+  linkedinUrl: { type: String, default: '' },
+  website: { type: String, default: '' },
 
   leetcodeUsername: { type: String, default: null },
   avatar: { type: String, default: '' },

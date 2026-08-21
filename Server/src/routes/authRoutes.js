@@ -1,8 +1,9 @@
 const express = require('express');
 const router = express.Router();
-const { register, registerInstitution, registerStaff, login, getMe, getSessions, revokeSession, forgotPassword, resetPassword } = require('../controllers/authController');
+const { register, getRegistrationOptions, registerInstitution, registerStaff, login, getMe, getSessions, revokeSession, forgotPassword, resetPassword } = require('../controllers/authController');
 const { protect } = require('../middleware/auth');
 
+router.get('/registration-options', getRegistrationOptions);
 router.post('/register', register);
 router.post('/register-institution', registerInstitution);
 router.post('/register-staff', registerStaff);

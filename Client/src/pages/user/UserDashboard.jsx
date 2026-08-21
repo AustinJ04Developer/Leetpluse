@@ -28,25 +28,49 @@ const UserDashboard = () => {
   const hasUsername = !!user?.leetcodeUsername && user.leetcodeUsername.trim() !== '';
 
   if (!hasUsername) {
-    if (user?.roleLevel >= 3) {
-      return <Navigate to="/institution/dashboard" replace />;
-    }
     return (
-      <div className="p-8 max-w-xl mx-auto text-center bg-slate-900/80 rounded-2xl border border-slate-800 space-y-4 my-12 shadow-xl">
-        <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
-        <h2 className="text-xl font-bold text-white">No LeetCode Account Linked</h2>
-        <p className="text-xs text-slate-400 leading-relaxed">
-          Personal coding metrics, problem heatmaps, and progress charts are displayed for accounts with a linked LeetCode username. Placement administrators and institutional managers do not require a personal LeetCode dashboard.
-        </p>
-        <div className="pt-2 flex justify-center gap-3">
-          <Link to="/settings" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition-all">
-            Link LeetCode Username
-          </Link>
-          {user?.roleLevel >= 2 && (
+      <div className="max-w-4xl mx-auto space-y-6 my-8">
+        <div className="p-8 text-center bg-slate-900/80 rounded-3xl border border-slate-800 space-y-4 shadow-2xl backdrop-blur-xl">
+          <AlertTriangle className="w-12 h-12 text-indigo-400 mx-auto" />
+          <h2 className="text-2xl font-extrabold text-white">Institutional Administrator Portal</h2>
+          <p className="text-xs text-slate-400 max-w-xl mx-auto leading-relaxed">
+            Welcome to the Institutional Management Hub. Access high-level college statistics, department metrics, daily student heatmaps, and global standings below.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-4 text-left">
+            <Link to="/institution/dashboard" className="p-4 rounded-2xl bg-indigo-950/40 border border-indigo-500/30 hover:bg-indigo-900/40 transition-all group">
+              <div className="text-indigo-400 font-bold text-sm mb-1 flex items-center justify-between">
+                <span>🏛️ Institution Stats</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Total students, department breakdown, solved problem trends & risk monitor.</p>
+            </Link>
+
+            <Link to="/leaderboard" className="p-4 rounded-2xl bg-amber-950/40 border border-amber-500/30 hover:bg-amber-900/40 transition-all group">
+              <div className="text-amber-400 font-bold text-sm mb-1 flex items-center justify-between">
+                <span>🏆 Standings & Ranks</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Institutional global leaderboard, department standings & top programmer ranks.</p>
+            </Link>
+
+            <Link to="/user-progress" className="p-4 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 hover:bg-emerald-900/40 transition-all group">
+              <div className="text-emerald-400 font-bold text-sm mb-1 flex items-center justify-between">
+                <span>📅 Daily Heatmaps</span>
+                <span className="group-hover:translate-x-1 transition-transform">→</span>
+              </div>
+              <p className="text-[11px] text-slate-400">Inspect student daily coding heatmaps, submission streak calendars & activity logs.</p>
+            </Link>
+          </div>
+
+          <div className="pt-4 flex flex-wrap justify-center gap-3">
+            <Link to="/settings" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition-all">
+              Link Personal LeetCode Username
+            </Link>
             <Link to="/admin/students" className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-all">
               Student Roster
             </Link>
-          )}
+          </div>
         </div>
       </div>
     );
@@ -173,7 +197,17 @@ const UserDashboard = () => {
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-1 flex items-center gap-2 font-medium">
+              <p className="text-xs text-slate-400 mt-1 flex flex-wrap items-center gap-2 font-medium">
+                {user?.institutionId?.name && (
+                  <span className="bg-indigo-950/50 text-indigo-300 border border-indigo-500/30 px-2 py-0.5 rounded-lg font-semibold">
+                    🏛️ {user.institutionId.name} ({user.institutionId.code})
+                  </span>
+                )}
+                {user?.departmentId?.name && (
+                  <span className="bg-slate-900 text-slate-300 border border-slate-800 px-2 py-0.5 rounded-lg">
+                    {user.departmentId.name}
+                  </span>
+                )}
                 <span>Handle: <strong className="text-slate-200">@{user?.leetcodeUsername || 'not_linked'}</strong></span>
                 <span>&bull;</span>
                 <span className="text-indigo-400 font-semibold">{user?.xp || 0} XP Earned</span>

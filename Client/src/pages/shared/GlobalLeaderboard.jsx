@@ -134,6 +134,11 @@ const GlobalLeaderboard = () => {
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
+                        {u.institutionId?.name && (
+                          <div className="text-[11px] text-indigo-400 font-medium truncate max-w-[160px]" title={u.institutionId.name}>
+                            🏛️ {u.institutionId.name}
+                          </div>
+                        )}
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
                           {u.departmentId?.code || 'CSE'}
                         </span>

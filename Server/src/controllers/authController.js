@@ -16,11 +16,82 @@ const generateTokens = (user) => {
   return { token };
 };
 
+const getRegistrationOptions = async (req, res) => {
+  try {
+    const Institution = require('../models/Institution');
+    const Department = require('../models/Department');
+    const AcademicYear = require('../models/AcademicYear');
+    const Batch = require('../models/Batch');
+    const Section = require('../models/Section');
+
+    const institutions = await Institution.find({}).select('name code slug logoUrl primaryColor').sort({ name: 1 });
+
+    let institutionId = req.query.institutionId;
+    if (!institutionId && institutions.length > 0) {
+      institutionId = institutions[0]._id;
+    }
+
+    let departments = [];
+    let academicYears = [];
+    let batches = [];
+    let sections = [];
+
+    if (institutionId) {
+      departments = await Department.find({ institutionId }).select('name code').sort({ name: 1 });
+      academicYears = await AcademicYear.find({ institutionId }).select('yearLabel displayName yearLevel isCurrent').sort({ yearLabel: -1 });
+      batches = await Batch.find({ institutionId }).select('name cohortRange departmentId academicYearId targetYearLevel').sort({ name: 1 });
+      sections = await Section.find({ institutionId }).select('name batchId').sort({ name: 1 });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        institutions,
+        selectedInstitutionId: institutionId || null,
+        departments,
+        academicYears,
+        batches,
+        sections
+      }
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
 const register = async (req, res) => {
   try {
-    const { name, email, password, leetcodeUsername, institutionId, departmentId, batchId, sectionId, registerNumber, studentId } = req.body;
+    const {
+      name,
+      email,
+      password,
+      leetcodeUsername,
+      institutionId,
+      departmentId,
+      departmentCustom,
+      academicYearId,
+      academicYearCustom,
+      batchId,
+      batchCustom,
+      academicBatch,
+      sectionId,
+      sectionCustom,
+      registerNumber,
+      studentId
+    } = req.body;
 
     const normalizedEmail = email ? email.toLowerCase().trim() : '';
+
+    const hasDept = departmentId || (departmentCustom && departmentCustom.trim());
+    const hasBatch = batchId || (batchCustom && batchCustom.trim()) || (academicBatch && academicBatch.trim());
+    const hasYear = academicYearId || (academicYearCustom && academicYearCustom.trim());
+
+    if (!name || !normalizedEmail || !password || !registerNumber || !studentId || !leetcodeUsername || !hasDept || !hasBatch || !hasYear) {
+      return res.status(400).json({
+        success: false,
+        message: 'Registration details (Name, Email, Password, Register No, Student ID, LeetCode Username, Department, Batch, and Academic Year) are required.'
+      });
+    }
 
     let existingUser = await User.findOne({ email: normalizedEmail });
     if (!existingUser && normalizedEmail) {
@@ -35,10 +106,136 @@ const register = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     const Institution = require('../models/Institution');
+    const Department = require('../models/Department');
+    const AcademicYear = require('../models/AcademicYear');
+    const Batch = require('../models/Batch');
+    const Section = require('../models/Section');
+
     let targetInstId = institutionId;
     if (!targetInstId) {
       const defaultInst = await Institution.findOne();
       if (defaultInst) targetInstId = defaultInst._id;
+    }
+
+    // 1. Resolve Department (Selected or Custom Typed)
+    let finalDeptId = departmentId || null;
+    if (!finalDeptId && departmentCustom && departmentCustom.trim() !== '') {
+      const cleanName = departmentCustom.trim();
+      let existingDept = await Department.findOne({
+        institutionId: targetInstId,
+        name: { $regex: new RegExp(`^${cleanName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') }
+      });
+      if (!existingDept && targetInstId) {
+        let code = cleanName.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 6) || 'DEPT';
+        const codeExists = await Department.findOne({ institutionId: targetInstId, code });
+        if (codeExists) {
+          code = `${code}_${Date.now().toString().slice(-4)}`;
+        }
+        existingDept = await Department.create({
+          institutionId: targetInstId,
+          name: cleanName,
+          code: code
+        });
+      }
+      if (existingDept) finalDeptId = existingDept._id;
+    }
+
+    // 2. Resolve Academic Year (Selected or Custom Typed)
+    let finalAcademicYearId = academicYearId || null;
+    if (!finalAcademicYearId && academicYearCustom && academicYearCustom.trim() !== '') {
+      const cleanYear = academicYearCustom.trim();
+      let existingYear = await AcademicYear.findOne({
+        institutionId: targetInstId,
+        yearLabel: { $regex: new RegExp(`^${cleanYear.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') }
+      });
+      if (!existingYear && targetInstId) {
+        existingYear = await AcademicYear.create({
+          institutionId: targetInstId,
+          yearLabel: cleanYear,
+          displayName: cleanYear,
+          isCurrent: true
+        });
+      }
+      if (existingYear) finalAcademicYearId = existingYear._id;
+    }
+
+    // 3. Resolve Batch & Academic Batch Cohort (Selected or Custom Typed)
+    let finalBatchId = batchId || null;
+    let finalAcademicBatch = academicBatch ? academicBatch.trim() : (batchCustom ? batchCustom.trim() : '');
+
+    if (!finalBatchId && (batchCustom || finalAcademicBatch)) {
+      const batchName = (batchCustom && batchCustom.trim()) ? batchCustom.trim() : finalAcademicBatch;
+      if (batchName && targetInstId) {
+        let existingBatch = await Batch.findOne({
+          institutionId: targetInstId,
+          name: { $regex: new RegExp(`^${batchName.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') }
+        });
+        if (!existingBatch) {
+          if (!finalAcademicYearId) {
+            let defaultYear = await AcademicYear.findOne({ institutionId: targetInstId });
+            if (!defaultYear) {
+              defaultYear = await AcademicYear.create({
+                institutionId: targetInstId,
+                yearLabel: '2026-2027',
+                displayName: '2026-2027',
+                isCurrent: true
+              });
+            }
+            finalAcademicYearId = defaultYear._id;
+          }
+
+          existingBatch = await Batch.create({
+            institutionId: targetInstId,
+            departmentId: finalDeptId || null,
+            academicYearId: finalAcademicYearId,
+            name: batchName,
+            cohortRange: finalAcademicBatch || batchName
+          });
+        }
+        if (existingBatch) {
+          finalBatchId = existingBatch._id;
+          if (!finalAcademicBatch && existingBatch.cohortRange) {
+            finalAcademicBatch = existingBatch.cohortRange;
+          }
+        }
+      }
+    } else if (finalBatchId && !finalAcademicBatch) {
+      const selectedBatchObj = await Batch.findById(finalBatchId);
+      if (selectedBatchObj) {
+        finalAcademicBatch = selectedBatchObj.cohortRange || selectedBatchObj.name;
+        if (!finalAcademicYearId && selectedBatchObj.academicYearId) {
+          finalAcademicYearId = selectedBatchObj.academicYearId;
+        }
+      }
+    }
+
+    // 4. Resolve Section (Selected or Custom Typed)
+    let finalSectionId = sectionId || null;
+    if (!finalSectionId && sectionCustom && sectionCustom.trim() !== '') {
+      const cleanSec = sectionCustom.trim();
+      let existingSection = await Section.findOne({
+        institutionId: targetInstId,
+        name: { $regex: new RegExp(`^${cleanSec.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') }
+      });
+      if (!existingSection && targetInstId) {
+        existingSection = await Section.create({
+          institutionId: targetInstId,
+          batchId: finalBatchId || null,
+          name: cleanSec
+        });
+      }
+      if (existingSection) finalSectionId = existingSection._id;
+    }
+
+    const reqSemester = req.body.semester ? Number(req.body.semester) : 1;
+    const reqYearLevel = req.body.semester ? Math.ceil(reqSemester / 2) : (req.body.yearLevel ? Number(req.body.yearLevel) : 1);
+
+    const reqStatus = req.body.academicStatus || 'Pursuing';
+    let reqCohorts = [];
+    if (Array.isArray(req.body.academicCohorts)) {
+      reqCohorts = req.body.academicCohorts.map(c => String(c).trim()).filter(Boolean);
+    } else if (req.body.cohortCustom && String(req.body.cohortCustom).trim()) {
+      reqCohorts = String(req.body.cohortCustom).split(',').map(c => c.trim()).filter(Boolean);
     }
 
     const newUser = await User.create({
@@ -48,9 +245,15 @@ const register = async (req, res) => {
       role: 'student',
       roleLevel: 1,
       institutionId: targetInstId || null,
-      departmentId: departmentId || null,
-      batchId: batchId || null,
-      sectionId: sectionId || null,
+      departmentId: finalDeptId || null,
+      academicYearId: finalAcademicYearId || null,
+      batchId: finalBatchId || null,
+      sectionId: finalSectionId || null,
+      academicBatch: finalAcademicBatch || '',
+      academicStatus: reqStatus,
+      academicCohorts: reqCohorts,
+      semester: reqSemester,
+      yearLevel: reqYearLevel,
       registerNumber: registerNumber || '',
       studentId: studentId || '',
       leetcodeUsername: leetcodeUsername ? leetcodeUsername.trim() : null
@@ -81,8 +284,14 @@ const register = async (req, res) => {
         roleLevel: newUser.roleLevel,
         institutionId: newUser.institutionId,
         departmentId: newUser.departmentId,
+        academicYearId: newUser.academicYearId,
         batchId: newUser.batchId,
         sectionId: newUser.sectionId,
+        academicBatch: newUser.academicBatch,
+        academicStatus: newUser.academicStatus,
+        academicCohorts: newUser.academicCohorts,
+        semester: newUser.semester,
+        yearLevel: newUser.yearLevel,
         leetcodeUsername: newUser.leetcodeUsername,
         avatar: newUser.avatar
       }
@@ -268,14 +477,16 @@ const login = async (req, res) => {
       .populate('institutionId', 'name code logoUrl primaryColor')
       .populate('departmentId', 'name code')
       .populate('batchId', 'name')
-      .populate('sectionId', 'name');
+      .populate('sectionId', 'name')
+      .populate('academicYearId', 'yearLabel displayName');
 
     if (!user && normalizedEmail) {
       user = await User.findOne({ email: { $regex: new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } })
         .populate('institutionId', 'name code logoUrl primaryColor')
         .populate('departmentId', 'name code')
         .populate('batchId', 'name')
-        .populate('sectionId', 'name');
+        .populate('sectionId', 'name')
+        .populate('academicYearId', 'yearLabel displayName');
     }
 
     if (!user) {
@@ -321,10 +532,24 @@ const login = async (req, res) => {
         departmentId: user.departmentId,
         batchId: user.batchId,
         sectionId: user.sectionId,
+        academicYearId: user.academicYearId,
         studentId: user.studentId,
         registerNumber: user.registerNumber,
+        semester: user.semester,
+        yearLevel: user.yearLevel,
+        academicBatch: user.academicBatch,
+        academicStatus: user.academicStatus || 'Pursuing',
+        academicCohorts: user.academicCohorts || [],
+        phone: user.phone,
+        designation: user.designation,
+        specialization: user.specialization,
+        officeLocation: user.officeLocation,
+        githubUrl: user.githubUrl,
+        linkedinUrl: user.linkedinUrl,
+        website: user.website,
         leetcodeUsername: user.leetcodeUsername,
         avatar: user.avatar,
+        bio: user.bio,
         mfaEnabled: user.mfaEnabled,
         xp: user.xp,
         level: user.level
@@ -342,7 +567,8 @@ const getMe = async (req, res) => {
       .populate('institutionId', 'name code logoUrl primaryColor')
       .populate('departmentId', 'name code')
       .populate('batchId', 'name')
-      .populate('sectionId', 'name');
+      .populate('sectionId', 'name')
+      .populate('academicYearId', 'yearLabel displayName');
 
     res.json({
       success: true,
@@ -364,8 +590,21 @@ const getMe = async (req, res) => {
         departmentId: populatedUser.departmentId,
         batchId: populatedUser.batchId,
         sectionId: populatedUser.sectionId,
+        academicYearId: populatedUser.academicYearId,
         studentId: populatedUser.studentId,
         registerNumber: populatedUser.registerNumber,
+        semester: populatedUser.semester,
+        yearLevel: populatedUser.yearLevel,
+        academicBatch: populatedUser.academicBatch,
+        academicStatus: populatedUser.academicStatus || 'Pursuing',
+        academicCohorts: populatedUser.academicCohorts || [],
+        phone: populatedUser.phone,
+        designation: populatedUser.designation,
+        specialization: populatedUser.specialization,
+        officeLocation: populatedUser.officeLocation,
+        githubUrl: populatedUser.githubUrl,
+        linkedinUrl: populatedUser.linkedinUrl,
+        website: populatedUser.website,
         leetcodeUsername: populatedUser.leetcodeUsername,
         avatar: populatedUser.avatar,
         bio: populatedUser.bio,
@@ -513,4 +752,4 @@ const resetPassword = async (req, res) => {
   }
 };
 
-module.exports = { register, registerInstitution, registerStaff, login, getMe, getSessions, revokeSession, forgotPassword, resetPassword };
+module.exports = { register, getRegistrationOptions, registerInstitution, registerStaff, login, getMe, getSessions, revokeSession, forgotPassword, resetPassword };

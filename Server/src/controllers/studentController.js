@@ -29,6 +29,7 @@ exports.getStudents = async (req, res) => {
 
     const totalStudents = await User.countDocuments(filter);
     const students = await User.find(filter)
+      .populate('institutionId', 'name code logoUrl primaryColor')
       .populate('departmentId', 'name code')
       .populate('batchId', 'name')
       .populate('sectionId', 'name')
@@ -82,10 +83,11 @@ exports.getHierarchicalRankings = async (req, res) => {
     if (sectionId) filter.sectionId = sectionId;
 
     const students = await User.find(filter)
+      .populate('institutionId', 'name code logoUrl primaryColor')
       .populate('departmentId', 'code name')
       .populate('batchId', 'name')
       .populate('sectionId', 'name')
-      .select('_id name email avatar leetcodeUsername departmentId batchId sectionId registerNumber')
+      .select('_id name email avatar leetcodeUsername institutionId departmentId batchId sectionId registerNumber')
       .lean();
 
     const studentIds = students.map(s => s._id);
@@ -150,6 +152,7 @@ exports.getAtRiskStudents = async (req, res) => {
     };
 
     const atRiskStudents = await User.find(filter)
+      .populate('institutionId', 'name code logoUrl primaryColor')
       .populate('departmentId', 'name code')
       .populate('batchId', 'name')
       .populate('sectionId', 'name')
@@ -222,7 +225,29 @@ exports.updateStudent = async (req, res) => {
     if (batchId !== undefined) student.batchId = batchId || null;
     if (sectionId !== undefined) student.sectionId = sectionId || null;
     if (academicBatch !== undefined) student.academicBatch = academicBatch || '';
-    if (yearLevel !== undefined) student.yearLevel = Number(yearLevel) || 1;
+    if (req.body.academicStatus !== undefined) student.academicStatus = req.body.academicStatus;
+    if (req.body.academicCohorts !== undefined) {
+      if (Array.isArray(req.body.academicCohorts)) {
+        student.academicCohorts = req.body.academicCohorts.map(c => String(c).trim()).filter(Boolean);
+      }
+    } else if (req.body.cohortCustom !== undefined) {
+      student.academicCohorts = String(req.body.cohortCustom).split(',').map(c => c.trim()).filter(Boolean);
+    }
+    
+    if (req.body.semester !== undefined) {
+      const semNum = Math.min(Math.max(Number(req.body.semester) || 1, 1), 8);
+      student.semester = semNum;
+      student.yearLevel = Math.ceil(semNum / 2);
+    } else if (yearLevel !== undefined) {
+      const yrNum = Math.min(Math.max(Number(yearLevel) || 1, 1), 4);
+      student.yearLevel = yrNum;
+      const minSem = (yrNum * 2) - 1;
+      const maxSem = yrNum * 2;
+      if (student.semester < minSem || student.semester > maxSem) {
+        student.semester = minSem;
+      }
+    }
+
     if (leetcodeUsername !== undefined) student.leetcodeUsername = leetcodeUsername ? leetcodeUsername.trim() : null;
 
     // --- ROLE UPGRADE LOGIC ---
@@ -267,6 +292,7 @@ exports.updateStudent = async (req, res) => {
     }
 
     const updatedStudent = await User.findById(id)
+      .populate('institutionId', 'name code logoUrl primaryColor')
       .populate('departmentId', 'name code')
       .populate('batchId', 'name')
       .populate('sectionId', 'name')

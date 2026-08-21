@@ -99,7 +99,10 @@ const StudentManagementPage = () => {
       batchId: student.batchId?._id || student.batchId || '',
       sectionId: student.sectionId?._id || student.sectionId || '',
       academicBatch: student.academicBatch || '',
+      academicStatus: student.academicStatus || 'Pursuing',
+      cohortCustom: student.academicCohorts ? student.academicCohorts.join(', ') : '',
       yearLevel: student.yearLevel || 1,
+      semester: student.semester || 1,
       leetcodeUsername: student.leetcodeUsername || '',
       role: student.role || 'student'
     });
@@ -224,6 +227,11 @@ const StudentManagementPage = () => {
                         <div className="text-xs text-slate-400">{s.email}</div>
                       </td>
                       <td className="p-4 text-xs">
+                        {s.institutionId?.name && (
+                          <div className="text-[11px] text-indigo-400 font-medium truncate max-w-[160px]" title={s.institutionId.name}>
+                            🏛️ {s.institutionId.name}
+                          </div>
+                        )}
                         <span className="font-semibold text-slate-200">{s.departmentId?.code || 'N/A'}</span>
                         <span className="text-slate-400"> • {s.batchId?.name || 'N/A'} ({s.sectionId?.name || 'Gen'})</span>
                       </td>
@@ -358,7 +366,18 @@ const StudentManagementPage = () => {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Academic Batch (Cohort)</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Academic Status</label>
+                  <select
+                    value={editForm.academicStatus || 'Pursuing'}
+                    onChange={e => setEditForm({ ...editForm, academicStatus: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-medium"
+                  >
+                    <option value="Pursuing">Pursuing</option>
+                    <option value="Graduated">Graduated</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Academic Batch (4-Year Range)</label>
                   <input
                     type="text"
                     placeholder="e.g. 2023 - 2027"
@@ -367,17 +386,54 @@ const StudentManagementPage = () => {
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Academic Cohort (Special Teams / Groups)</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Optional</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Elite Training Batch, MPM Batch (Optional)"
+                  value={editForm.cohortCustom || ''}
+                  onChange={e => setEditForm({ ...editForm, cohortCustom: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Year Level</label>
                   <select
                     value={editForm.yearLevel || 1}
-                    onChange={e => setEditForm({ ...editForm, yearLevel: e.target.value })}
+                    onChange={e => {
+                      const yr = Number(e.target.value);
+                      const minSem = (yr * 2) - 1;
+                      const maxSem = yr * 2;
+                      const curSem = Number(editForm.semester || 1);
+                      const nextSem = (curSem < minSem || curSem > maxSem) ? minSem : curSem;
+                      setEditForm({ ...editForm, yearLevel: yr, semester: nextSem });
+                    }}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
                   >
                     <option value="1">1st Year (First Year)</option>
                     <option value="2">2nd Year (Second Year)</option>
                     <option value="3">3rd Year (Pre-Final Year)</option>
                     <option value="4">4th Year (Final Year)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Semester (Mapped)</label>
+                  <select
+                    value={editForm.semester || 1}
+                    onChange={e => {
+                      const sem = Number(e.target.value);
+                      setEditForm({ ...editForm, semester: sem, yearLevel: Math.ceil(sem / 2) });
+                    }}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  >
+                    {[((Number(editForm.yearLevel || 1)) * 2) - 1, Number(editForm.yearLevel || 1) * 2].map(sem => (
+                      <option key={sem} value={sem}>Semester {sem}</option>
+                    ))}
                   </select>
                 </div>
               </div>

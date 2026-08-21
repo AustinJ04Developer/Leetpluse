@@ -82,6 +82,11 @@ const AtRiskStudentPage = () => {
                       <div className="text-xs text-slate-400">{s.email}</div>
                     </td>
                     <td className="p-4 text-xs">
+                      {s.institutionId?.name && (
+                        <div className="text-[11px] text-indigo-400 font-medium truncate max-w-[160px]" title={s.institutionId.name}>
+                          🏛️ {s.institutionId.name}
+                        </div>
+                      )}
                       <span className="font-semibold text-slate-200">{s.departmentId?.code || 'N/A'}</span>
                       <span className="text-slate-400"> • {s.batchId?.name || 'N/A'} ({s.sectionId?.name || 'A'})</span>
                     </td>

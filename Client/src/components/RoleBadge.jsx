@@ -15,7 +15,7 @@ const RoleBadge = ({ role, roleLevel, className = '' }) => {
       return (
         <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r from-purple-600/30 to-indigo-600/30 text-purple-300 border border-purple-500/40 text-xs font-bold shadow-sm shadow-purple-500/20 ${className}`}>
           <ShieldCheck className="w-3.5 h-3.5 text-purple-400" />
-          <span>Platform SuperAdmin</span>
+          <span>Developer & Super Administrator</span>
         </span>
       );
     case 5:
