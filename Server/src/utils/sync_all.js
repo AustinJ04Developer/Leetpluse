@@ -10,7 +10,7 @@ async function syncAllUsers() {
     console.log('Connecting to MongoDB Atlas...');
     await mongoose.connect(mongoUri);
 
-    const users = await User.find({ role: { $ne: 'superadmin' }, leetcodeUsername: { $exists: true, $ne: '' } });
+    const users = await User.find({ leetcodeUsername: { $exists: true, $ne: null, $ne: '' } });
     console.log(`Found ${users.length} users with LeetCode handles to sync...`);
 
     for (const u of users) {

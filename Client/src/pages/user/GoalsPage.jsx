@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../services/api';
-import { Target, Plus, CheckCircle, Clock } from 'lucide-react';
+import { Target, Plus, CheckCircle, Clock, Trash2 } from 'lucide-react';
 
 const GoalsPage = () => {
   const [goals, setGoals] = useState([]);
@@ -43,6 +43,16 @@ const GoalsPage = () => {
     }
   };
 
+  const handleDeleteGoal = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this goal?')) return;
+    try {
+      await api.delete(`/goals/${id}`);
+      loadGoals();
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -64,21 +74,30 @@ const GoalsPage = () => {
         {goals.map((g) => {
           const pct = Math.min(100, Math.round((g.currentSolved / g.targetSolved) * 100));
           return (
-            <div key={g._id} className="glass-card glass-card-hover rounded-2xl p-5 border border-slate-800 flex flex-col justify-between">
+            <div key={g._id} className="glass-card glass-card-hover rounded-2xl p-5 border border-slate-800 flex flex-col justify-between relative group">
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-indigo-500/10 text-indigo-400 border border-indigo-500/20">
                     {g.period} Goal
                   </span>
-                  {g.completed ? (
-                    <span className="flex items-center gap-1 text-xs text-emerald-400 font-bold">
-                      <CheckCircle className="w-3.5 h-3.5" /> Completed
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs text-amber-400 font-medium">
-                      <Clock className="w-3.5 h-3.5" /> In Progress
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {g.completed ? (
+                      <span className="flex items-center gap-1 text-xs text-emerald-400 font-bold">
+                        <CheckCircle className="w-3.5 h-3.5" /> Completed
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-xs text-amber-400 font-medium">
+                        <Clock className="w-3.5 h-3.5" /> In Progress
+                      </span>
+                    )}
+                    <button
+                      onClick={() => handleDeleteGoal(g._id)}
+                      className="text-slate-500 hover:text-rose-400 transition-colors p-1 rounded-lg hover:bg-rose-500/10"
+                      title="Delete Goal"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
                 <h3 className="font-bold text-white text-base mt-1">{g.title}</h3>
                 <p className="text-xs text-slate-400 mt-1">
@@ -98,6 +117,7 @@ const GoalsPage = () => {
           );
         })}
       </div>
+
 
       {modalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">

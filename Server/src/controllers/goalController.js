@@ -45,4 +45,15 @@ const updateGoalProgress = async (req, res) => {
   }
 };
 
-module.exports = { getGoals, createGoal, updateGoalProgress };
+const deleteGoal = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Goal.findOneAndDelete({ _id: id, userId: req.user._id });
+    res.json({ success: true, message: 'Goal deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+module.exports = { getGoals, createGoal, updateGoalProgress, deleteGoal };
+

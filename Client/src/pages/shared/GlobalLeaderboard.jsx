@@ -17,12 +17,12 @@ const GlobalLeaderboard = () => {
 
   const loadGroups = async () => {
     try {
-      const res = await api.get('/admin/group-overview');
+      const res = await api.get('/institutions/batches/list');
       if (res.data.success) {
-        setGroups(res.data.groups || []);
+        setGroups(res.data.data || []);
       }
     } catch (err) {
-      // Non-critical if user doesn't have admin route access
+      // Fallback
     }
   };
 
@@ -57,25 +57,25 @@ const GlobalLeaderboard = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-white">
-            Global Leaderboard
+            Institutional Global Leaderboard
           </h1>
           <p className="text-xs text-slate-400">
-            Standings for all programmers ranked by total solved, difficulty breakdown & streak
+            Official standings for all student coders across all departments and batches
           </p>
         </div>
 
-        {/* Batch Selector */}
+        {/* Batch / Department Filter */}
         <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
           <Filter className="w-4 h-4 text-indigo-400 ml-2" />
-          <span className="text-xs font-semibold text-slate-300">Select Batch:</span>
+          <span className="text-xs font-semibold text-slate-300">Filter Batch:</span>
           <select
             value={selectedGroupId}
             onChange={(e) => setSelectedGroupId(e.target.value)}
             className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-white outline-none focus:border-indigo-500"
           >
-            <option value="all">All Members (Org-Wide)</option>
+            <option value="all">All Students (Institution-Wide)</option>
             {groups.map(g => (
-              <option key={g._id} value={g._id}>{g.name}</option>
+              <option key={g._id} value={g._id}>{g.name} ({g.departmentId?.code || 'Dept'})</option>
             ))}
           </select>
         </div>
@@ -83,7 +83,7 @@ const GlobalLeaderboard = () => {
 
       <div className="glass-card rounded-3xl p-6 border border-slate-800 space-y-4">
         {loading ? (
-          <div className="p-8 text-center text-slate-400 animate-pulse">Loading batch rankings...</div>
+          <div className="p-8 text-center text-slate-400 animate-pulse">Loading student standings...</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -91,10 +91,10 @@ const GlobalLeaderboard = () => {
                 <tr className="border-b border-slate-800 text-[11px] font-bold uppercase tracking-wider text-slate-400">
                   <th className="py-3 px-4">Rank</th>
                   <th className="py-3 px-4">Programmer</th>
-                  <th className="py-3 px-4">Role / Batch</th>
+                  <th className="py-3 px-4">Department & Batch</th>
                   <th className="py-3 px-4">Total Solved</th>
                   <th className="py-3 px-4">Difficulty Breakdown</th>
-                  <th className="py-3 px-4">Active Streak</th>
+                  <th className="py-3 px-4">Streak</th>
                   <th className="py-3 px-4 text-right">XP Points</th>
                 </tr>
               </thead>
@@ -129,17 +129,16 @@ const GlobalLeaderboard = () => {
                                 <span className="text-[9px] font-extrabold bg-indigo-500 text-white px-1.5 py-0.2 rounded">YOU</span>
                               )}
                             </div>
-                            <p className="text-[11px] text-indigo-400">@{item.leetcodeUsername}</p>
+                            <p className="text-[11px] text-indigo-400 font-mono">@{item.leetcodeUsername || u.leetcodeUsername}</p>
                           </div>
                         </div>
                       </td>
                       <td className="py-3.5 px-4">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
-                          u.role === 'devadmin' ? 'bg-purple-500/20 text-purple-400' :
-                          u.role === 'admin' ? 'bg-blue-500/20 text-blue-400' :
-                          'bg-emerald-500/20 text-emerald-400'
-                        }`}>
-                          {u.role === 'admin' ? 'Admin (Participant)' : u.role === 'devadmin' ? 'DevAdmin' : 'User'}
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          {u.departmentId?.code || 'CSE'}
+                        </span>
+                        <span className="text-slate-400 text-xs ml-1.5">
+                          {u.batchId?.name || 'Batch'} ({u.sectionId?.name || 'Sec A'})
                         </span>
                       </td>
                       <td className="py-3.5 px-4 font-extrabold text-white text-sm">

@@ -5,15 +5,27 @@ const bcrypt = require('bcryptjs');
 
 const updateProfile = async (req, res) => {
   try {
-    const { name, leetcodeUsername, bio, avatar, mfaEnabled } = req.body;
+    const { 
+      name, 
+      leetcodeUsername, 
+      bio, 
+      avatar, 
+      mfaEnabled,
+      departmentId,
+      batchId,
+      sectionId,
+      academicYearId,
+      registerNumber,
+      studentId,
+      semester,
+      phone
+    } = req.body;
+    
     const user = await User.findById(req.user._id);
 
     if (name) user.name = name;
     
-    // Server-side enforcement: Rejects setting leetcodeUsername for SuperAdmin (management-only role)
-    if (user.role === 'superadmin') {
-      user.leetcodeUsername = null; // Always null for SuperAdmin
-    } else if (leetcodeUsername !== undefined) {
+    if (leetcodeUsername !== undefined) {
       user.leetcodeUsername = leetcodeUsername ? leetcodeUsername.trim() : null;
     }
 
@@ -21,29 +33,53 @@ const updateProfile = async (req, res) => {
     if (avatar !== undefined) user.avatar = avatar;
     if (mfaEnabled !== undefined) user.mfaEnabled = mfaEnabled;
 
+    if (departmentId !== undefined) user.departmentId = departmentId || null;
+    if (batchId !== undefined) user.batchId = batchId || null;
+    if (sectionId !== undefined) user.sectionId = sectionId || null;
+    if (academicYearId !== undefined) user.academicYearId = academicYearId || null;
+    if (registerNumber !== undefined) user.registerNumber = registerNumber;
+    if (studentId !== undefined) user.studentId = studentId;
+    if (semester !== undefined) user.semester = Number(semester) || 1;
+    if (phone !== undefined) user.phone = phone;
+
     await user.save();
+
+    const populatedUser = await User.findById(user._id)
+      .populate('departmentId', 'name code')
+      .populate('batchId', 'name')
+      .populate('sectionId', 'name')
+      .populate('academicYearId', 'yearLabel');
 
     res.json({
       success: true,
       message: 'Profile updated successfully',
       user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        roleLevel: user.roleLevel,
-        leetcodeUsername: user.leetcodeUsername,
-        avatar: user.avatar,
-        bio: user.bio,
-        mfaEnabled: user.mfaEnabled,
-        xp: user.xp,
-        level: user.level
+        id: populatedUser._id,
+        name: populatedUser.name,
+        email: populatedUser.email,
+        role: populatedUser.role,
+        roleLevel: populatedUser.roleLevel,
+        departmentId: populatedUser.departmentId,
+        batchId: populatedUser.batchId,
+        sectionId: populatedUser.sectionId,
+        academicYearId: populatedUser.academicYearId,
+        registerNumber: populatedUser.registerNumber,
+        studentId: populatedUser.studentId,
+        semester: populatedUser.semester,
+        phone: populatedUser.phone,
+        leetcodeUsername: populatedUser.leetcodeUsername,
+        avatar: populatedUser.avatar,
+        bio: populatedUser.bio,
+        mfaEnabled: populatedUser.mfaEnabled,
+        xp: populatedUser.xp,
+        level: populatedUser.level
       }
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 const getAllUsers = async (req, res) => {
   try {
@@ -97,12 +133,22 @@ const updateUserRole = async (req, res) => {
     const { userId } = req.params;
     const { role } = req.body;
 
-    const roleLevels = { devadmin: 4, superadmin: 3, admin: 2, user: 1 };
+    const roleLevels = { 
+      superadmin: 6, 
+      institution_admin: 5, 
+      hod: 4, 
+      faculty: 3, 
+      student_rep: 2, 
+      student: 1, 
+      devadmin: 6, 
+      admin: 2, 
+      user: 1 
+    };
+
     if (!roleLevels[role]) {
       return res.status(400).json({ success: false, message: 'Invalid role specified' });
     }
 
-    const Group = require('../models/Group');
     const targetUser = await User.findById(userId);
     if (!targetUser) {
       return res.status(404).json({ success: false, message: 'User not found' });
@@ -111,22 +157,6 @@ const updateUserRole = async (req, res) => {
     const updateData = { role, roleLevel: roleLevels[role] };
     if (req.body.groupId) {
       updateData.groupId = req.body.groupId;
-    }
-
-    if (role === 'superadmin') {
-      updateData.leetcodeUsername = null; // Reset handle for management-only role
-      await LeetCodeStat.deleteMany({ userId });
-    } else if (role === 'admin') {
-      let existingGroup = await Group.findOne({ adminId: userId });
-      if (!existingGroup) {
-        existingGroup = await Group.create({
-          name: `${targetUser.name}'s Cohort`,
-          adminId: userId,
-          orgId: targetUser.orgId,
-          description: 'Assigned Cohort Accelerator Group'
-        });
-      }
-      updateData.groupId = existingGroup._id;
     }
 
     const updatedUser = await User.findByIdAndUpdate(
@@ -148,6 +178,7 @@ const updateUserRole = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 const bulkImportUsers = async (req, res) => {
   try {

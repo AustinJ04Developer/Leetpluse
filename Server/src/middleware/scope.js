@@ -26,19 +26,34 @@ const getStatsVisibilityScope = (requester, targetUserId) => {
 };
 
 const getLeaderboardFilter = (requester, requestedGroupId) => {
-  // Always exclude Super Admin from participant rankings
   const userFilter = { 
-    role: { $ne: 'superadmin' } 
+    role: { $in: ['student', 'user', 'admin', 'faculty', 'student_rep'] } 
   };
 
-  if (requestedGroupId && requestedGroupId !== 'all') {
-    userFilter.groupId = requestedGroupId;
-  } else if (requester.orgId) {
-    userFilter.orgId = requester.orgId;
+  if (requester.roleLevel < 6 && requester.institutionId) {
+    userFilter.institutionId = requester.institutionId;
+  }
+
+  // Student Representative (CR / Level 2): Restrict leaderboard to own section or batch
+  if (requester.role === 'student_rep' || requester.roleLevel === 2) {
+    if (requester.sectionId) {
+      userFilter.sectionId = requester.sectionId;
+    } else if (requester.batchId) {
+      userFilter.batchId = requester.batchId;
+    } else if (requester.departmentId) {
+      userFilter.departmentId = requester.departmentId;
+    }
+  } else if (requestedGroupId && requestedGroupId !== 'all') {
+    userFilter.$or = [
+      { batchId: requestedGroupId },
+      { departmentId: requestedGroupId },
+      { groupId: requestedGroupId }
+    ];
   }
 
   return userFilter;
 };
+
 
 module.exports = {
   getStatsVisibilityScope,

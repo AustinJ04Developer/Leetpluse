@@ -11,11 +11,13 @@ import {
   Settings,
   Sparkles,
   LayoutDashboard,
-  ExternalLink
+  ExternalLink,
+  Terminal
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import SyncStatusBadge from './SyncStatusBadge';
 import api from '../services/api';
+import RoleBadge from './RoleBadge';
 import UserAvatar from './UserAvatar';
 
 const Navbar = ({ onToggleMobileMenu }) => {
@@ -58,18 +60,6 @@ const Navbar = ({ onToggleMobileMenu }) => {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const getRoleBadge = (role) => {
-    switch (role) {
-      case 'devadmin':
-        return <span className="bg-purple-500/20 text-purple-400 border border-purple-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">DevAdmin L4</span>;
-      case 'superadmin':
-        return <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">SuperAdmin L3</span>;
-      case 'admin':
-        return <span className="bg-blue-500/20 text-blue-400 border border-blue-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">Admin L2</span>;
-      default:
-        return <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider">User L1</span>;
-    }
-  };
 
   return (
     <nav className="h-16 bg-[#0b0f19]/95 border-b border-slate-800/80 sticky top-0 z-40 backdrop-blur-md px-4 sm:px-6 flex items-center justify-between select-none">
@@ -151,7 +141,7 @@ const Navbar = ({ onToggleMobileMenu }) => {
                   <span className="font-extrabold text-xs text-white max-w-[110px] truncate">{user.name}</span>
                 </div>
                 <div className="flex items-center gap-1 mt-0.5">
-                  {getRoleBadge(user.role)}
+                  <RoleBadge role={user.role} roleLevel={user.roleLevel} />
                 </div>
               </div>
 
@@ -173,14 +163,40 @@ const Navbar = ({ onToggleMobileMenu }) => {
 
                 {/* Profile Options List */}
                 <div className="space-y-1">
-                  <Link
-                    to="/dashboard"
-                    onClick={() => setDropdownOpen(false)}
-                    className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600/10 rounded-xl transition-all"
-                  >
-                    <LayoutDashboard className="w-4 h-4 text-indigo-400" />
-                    <span>My Analytics Dashboard</span>
-                  </Link>
+                  {(user.roleLevel === 1 || user.roleLevel >= 6 || user.role === 'student' || user.role === 'user' || user.role === 'superadmin') && (
+                    <Link
+                      to="/dashboard"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600/10 rounded-xl transition-all"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-indigo-400" />
+                      <span>My Student Analytics</span>
+                    </Link>
+                  )}
+
+                  {(user.roleLevel >= 4 || user.role === 'institution_admin') && (
+                    <Link
+                      to="/institution/dashboard"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-slate-300 hover:text-white hover:bg-indigo-600/10 rounded-xl transition-all"
+                    >
+                      <LayoutDashboard className="w-4 h-4 text-indigo-400" />
+                      <span>Institution Dashboard</span>
+                    </Link>
+                  )}
+
+                  {(user.roleLevel >= 6 || user.role === 'superadmin' || user.role === 'devadmin') && (
+                    <Link
+                      to="/devadmin/health"
+                      onClick={() => setDropdownOpen(false)}
+                      className="flex items-center gap-3 px-3 py-2.5 text-xs font-semibold text-purple-300 hover:text-white hover:bg-purple-600/10 rounded-xl transition-all"
+                    >
+                      <Terminal className="w-4 h-4 text-purple-400" />
+                      <span>Developer & System Health</span>
+                    </Link>
+                  )}
+
+
 
                   <Link
                     to="/profile"

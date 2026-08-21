@@ -21,6 +21,11 @@ const goalRoutes = require('./routes/goalRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const weeklyProblemRoutes = require('./routes/weeklyProblemRoutes');
 
+const institutionRoutes = require('./routes/institutionRoutes');
+const studentRoutes = require('./routes/studentRoutes');
+const facultyRoutes = require('./routes/facultyRoutes');
+const reportRoutes = require('./routes/reportRoutes');
+
 const app = express();
 const server = http.createServer(app);
 
@@ -42,6 +47,12 @@ app.use('/api/devadmin', devadminRoutes);
 app.use('/api/goals', goalRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/weekly-problems', weeklyProblemRoutes);
+
+app.use('/api/institutions', institutionRoutes);
+app.use('/api/students', studentRoutes);
+app.use('/api/faculty', facultyRoutes);
+app.use('/api/reports', reportRoutes);
+
 
 // Base API welcome & Health check endpoints
 app.get(['/', '/api'], (req, res) => {

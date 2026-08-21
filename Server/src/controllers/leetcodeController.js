@@ -37,13 +37,6 @@ const getStats = async (req, res) => {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    if (targetUserDoc.role === 'superadmin') {
-      return res.status(400).json({
-        success: false,
-        message: 'Super Admin is a management role without a personal LeetCode account.'
-      });
-    }
-
     let stats = await LeetCodeStat.findOne({ userId: targetUserId });
     
     if (!stats && targetUserDoc.leetcodeUsername) {
@@ -73,8 +66,8 @@ const triggerSyncNow = async (req, res) => {
 
     const userToSync = await User.findById(targetUserId);
 
-    if (!userToSync || !userToSync.leetcodeUsername || userToSync.role === 'superadmin') {
-      return res.status(400).json({ success: false, message: 'User does not have a linked LeetCode username or is a Super Admin management role.' });
+    if (!userToSync || !userToSync.leetcodeUsername) {
+      return res.status(400).json({ success: false, message: 'User does not have a linked LeetCode username.' });
     }
 
     const result = await syncUserLeetCode(userToSync);
@@ -112,12 +105,6 @@ const getHeatmap = async (req, res) => {
       }
     }
 
-
-    const targetUserDoc = await User.findById(targetUserId);
-    if (targetUserDoc && targetUserDoc.role === 'superadmin') {
-      return res.json({ success: true, logs: [], message: 'Super Admin has no activity heatmap.' });
-    }
-
     const logs = await SubmissionLog.find({ userId: targetUserId }).sort({ date: 1 });
     res.json({ success: true, logs });
   } catch (err) {
@@ -125,10 +112,11 @@ const getHeatmap = async (req, res) => {
   }
 };
 
+
 const getLeaderboard = async (req, res) => {
   try {
     const requester = req.user;
-    const { groupId } = req.query; // Used for SuperAdmin & DevAdmin batch selection
+    const { groupId } = req.query;
     
     const userFilter = getLeaderboardFilter(requester, groupId);
     userFilter.leetcodeUsername = { $ne: null, $exists: true };
@@ -137,13 +125,21 @@ const getLeaderboard = async (req, res) => {
     const eligibleUserIds = eligibleUsers.map(u => u._id);
 
     const leaderboard = await LeetCodeStat.find({ userId: { $in: eligibleUserIds } })
-      .populate('userId', 'name email avatar role leetcodeUsername xp level groupId')
+      .populate({
+        path: 'userId',
+        select: 'name email avatar role leetcodeUsername xp level departmentId batchId sectionId registerNumber',
+        populate: [
+          { path: 'departmentId', select: 'name code' },
+          { path: 'batchId', select: 'name' },
+          { path: 'sectionId', select: 'name' }
+        ]
+      })
       .sort({ totalSolved: -1, easySolved: -1, mediumSolved: -1, hardSolved: -1 });
 
     res.json({ 
       success: true, 
       leaderboard,
-      scopedGroup: (requester.roleLevel <= 2) ? requester.groupId : (groupId || 'all')
+      scopedGroup: groupId || 'all'
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -155,17 +151,25 @@ const getBatchProgressMatrix = async (req, res) => {
     const requester = req.user;
     const { groupId } = req.query;
 
-    let userQuery = { role: { $ne: 'superadmin' } };
+    let userQuery = { role: { $in: ['student', 'user', 'faculty', 'admin'] } };
+
+    if (requester.roleLevel < 5 && requester.institutionId) {
+      userQuery.institutionId = requester.institutionId;
+    }
 
     if (groupId && groupId !== 'all') {
-      userQuery.groupId = groupId;
-    } else if (requester.orgId) {
-      userQuery.orgId = requester.orgId;
+      userQuery.$or = [
+        { batchId: groupId },
+        { departmentId: groupId },
+        { groupId: groupId }
+      ];
     }
 
     const users = await User.find(userQuery)
-      .select('name email avatar role leetcodeUsername xp level groupId')
-      .populate('groupId', 'name')
+      .select('name email avatar role leetcodeUsername xp level departmentId batchId sectionId registerNumber')
+      .populate('departmentId', 'name code')
+      .populate('batchId', 'name')
+      .populate('sectionId', 'name')
       .sort({ name: 1 });
 
     const userIds = users.map(u => u._id);
@@ -205,6 +209,7 @@ const getBatchProgressMatrix = async (req, res) => {
     res.status(500).json({ success: false, message: err.message });
   }
 };
+
 
 module.exports = { getStats, triggerSyncNow, getHeatmap, getLeaderboard, getBatchProgressMatrix };
 

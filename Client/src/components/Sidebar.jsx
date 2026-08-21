@@ -15,6 +15,10 @@ import {
   Settings,
   Bell,
   Calendar,
+  AlertTriangle,
+  Layers,
+  GraduationCap,
+  Download,
   X
 } from 'lucide-react';
 
@@ -25,35 +29,56 @@ const Sidebar = ({ isOpen, onClose }) => {
   const role = user.role;
   const roleLevel = user.roleLevel || 1;
 
-  const userNav = [
-    { name: 'My Analytics', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'Daily Progress', path: '/user-progress', icon: Calendar },
-    { name: 'Leaderboards', path: '/leaderboard', icon: Trophy },
-    { name: 'Goals & Targets', path: '/goals', icon: Target },
+  const studentNav = [
+    { name: 'My Performance', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Daily Heatmap', path: '/user-progress', icon: Calendar },
+    { name: 'Rankings', path: '/leaderboard', icon: Trophy },
+    { name: 'My Goals', path: '/goals', icon: Target },
     { name: 'Notifications', path: '/notifications', icon: Bell }
   ];
 
-  const adminNav = [
-    { name: 'Cohort Management', path: '/admin/overview', icon: Users },
-    { name: 'Daily Progress', path: '/user-progress', icon: Calendar },
-    { name: 'Group Challenges', path: '/admin/challenges', icon: Flag },
-    { name: 'Group Reports', path: '/admin/reports', icon: FileText }
+  const studentRepNav = [
+    { name: 'My Personal Analytics', path: '/dashboard', icon: LayoutDashboard },
+    { name: 'Class Roster & Students', path: '/admin/students', icon: Users },
+    { name: 'Class Standings', path: '/leaderboard', icon: Trophy },
+    { name: 'Class Daily Heatmap', path: '/user-progress', icon: Calendar },
+    { name: 'Class Targets & Goals', path: '/goals', icon: Target },
+    { name: 'At-Risk Classmates', path: '/admin/at-risk', icon: AlertTriangle },
+    { name: 'Notifications', path: '/notifications', icon: Bell }
+  ];
+
+  const facultyNav = [
+    { name: 'Faculty Dashboard', path: '/faculty/dashboard', icon: LayoutDashboard },
+    { name: 'Assigned Students', path: '/admin/students', icon: Users },
+    { name: 'Assign Targets', path: '/goals', icon: Target },
+    { name: 'At-Risk Students', path: '/admin/at-risk', icon: AlertTriangle },
+    { name: 'Export Reports', path: '/reports', icon: Download }
+  ];
+
+  const hodNav = [
+    { name: 'HOD Overview', path: '/institution/dashboard', icon: Building2 },
+    { name: 'Department Batches', path: '/institution/hierarchy', icon: Layers },
+    { name: 'Department Students', path: '/admin/students', icon: GraduationCap },
+    { name: 'Faculty & Targets', path: '/faculty/dashboard', icon: Users },
+    { name: 'At-Risk Monitor', path: '/admin/at-risk', icon: AlertTriangle },
+    { name: 'Department Reports', path: '/reports', icon: Download }
+  ];
+
+  const instAdminNav = [
+    { name: 'Institution Overview', path: '/institution/dashboard', icon: Building2 },
+    { name: 'Academic Hierarchy', path: '/institution/hierarchy', icon: Layers },
+    { name: 'Student Roster', path: '/admin/students', icon: GraduationCap },
+    { name: 'At-Risk Monitor', path: '/admin/at-risk', icon: AlertTriangle },
+    { name: 'Institutional Reports', path: '/reports', icon: Download }
   ];
 
   const superAdminNav = [
-    { name: 'Org Analytics', path: '/superadmin/analytics', icon: Building2 },
-    { name: 'Admin Manager', path: '/superadmin/admins', icon: Users },
-    { name: 'Daily Progress', path: '/user-progress', icon: Calendar },
-    { name: 'Branding & Billing', path: '/superadmin/branding', icon: Sliders },
-    { name: 'Global Leaderboard', path: '/leaderboard', icon: Trophy },
-    { name: 'Notifications', path: '/notifications', icon: Bell }
-  ];
-
-  const devAdminNav = [
+    { name: 'Platform Overview', path: '/superadmin/analytics', icon: Building2 },
+    { name: 'All Institutions', path: '/institution/dashboard', icon: Layers },
     { name: 'System Health', path: '/devadmin/health', icon: Activity },
     { name: 'Feature Flags', path: '/devadmin/feature-flags', icon: Sliders },
     { name: 'System Logs', path: '/devadmin/logs', icon: FileText },
-    { name: 'DB Read Console', path: '/devadmin/db-console', icon: Terminal },
+    { name: 'DB Console', path: '/devadmin/db-console', icon: Terminal },
     { name: 'User Impersonation', path: '/devadmin/impersonate', icon: Users }
   ];
 
@@ -108,7 +133,7 @@ const Sidebar = ({ isOpen, onClose }) => {
         <div>
           {/* Mobile Close Button */}
           <div className="flex items-center justify-between md:hidden mb-4 pb-2 border-b border-slate-800">
-            <span className="font-extrabold text-sm text-white">Menu Navigation</span>
+            <span className="font-extrabold text-sm text-white">Academic Navigation</span>
             <button 
               onClick={onClose}
               className="p-1.5 text-slate-400 hover:text-white rounded-lg"
@@ -117,15 +142,23 @@ const Sidebar = ({ isOpen, onClose }) => {
             </button>
           </div>
 
-          {/* SuperAdmin is management-only */}
-          {role === 'superadmin' ? (
-            renderNavSection('Executive Management (L3)', superAdminNav)
-          ) : (
-            renderNavSection('Personal Workspace', userNav)
-          )}
-          
-          {roleLevel === 2 && renderNavSection('Admin Tools (L2)', adminNav)}
-          {roleLevel === 4 && renderNavSection('DevAdmin Console (L4)', devAdminNav)}
+          {/* Student Workspace - For Students and Developer SuperAdmins */}
+          {(roleLevel === 1 || roleLevel >= 6 || role === 'superadmin') && renderNavSection('Student Workspace', studentNav)}
+
+          {/* Student Representative Navigation */}
+          {roleLevel === 2 && renderNavSection('Student Rep Workspace', studentRepNav)}
+
+          {/* Faculty Navigation */}
+          {roleLevel === 3 && renderNavSection('Faculty Portal', facultyNav)}
+
+          {/* Department HOD Navigation */}
+          {roleLevel === 4 && renderNavSection('Department HOD Portal', hodNav)}
+
+          {/* Institutional Manager / Admin Navigation */}
+          {roleLevel === 5 && renderNavSection('Institution Management', instAdminNav)}
+
+          {/* Platform SuperAdmin Navigation */}
+          {roleLevel >= 6 && renderNavSection('Platform SuperAdmin', superAdminNav)}
         </div>
 
         <div className="pt-4 border-t border-slate-800/80">

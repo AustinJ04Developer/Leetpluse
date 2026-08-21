@@ -25,9 +25,6 @@ import {
 const UserDashboard = () => {
   const { user } = useAuth();
 
-  if (user?.role === 'superadmin') {
-    return <Navigate to="/superadmin/analytics" replace />;
-  }
 
   const { lastSyncEvent } = useSocket();
   const [stats, setStats] = useState(null);

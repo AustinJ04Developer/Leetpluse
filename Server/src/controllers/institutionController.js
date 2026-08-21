@@ -1,0 +1,277 @@
+const Institution = require('../models/Institution');
+const Department = require('../models/Department');
+const AcademicYear = require('../models/AcademicYear');
+const Batch = require('../models/Batch');
+const Section = require('../models/Section');
+const User = require('../models/User');
+
+// --- INSTITUTION MANAGEMENT ---
+exports.getAllInstitutions = async (req, res) => {
+  try {
+    const filter = req.user.roleLevel === 5 ? {} : { _id: req.user.institutionId };
+    const institutions = await Institution.find(filter).sort({ name: 1 });
+    res.json({ success: true, count: institutions.length, data: institutions });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.getInstitutionById = async (req, res) => {
+  try {
+    const instId = req.params.id || req.user.institutionId;
+    if (req.user.roleLevel < 5 && instId.toString() !== req.user.institutionId?.toString()) {
+      return res.status(403).json({ success: false, message: 'Forbidden: Access to specified institution denied' });
+    }
+    const institution = await Institution.findById(instId);
+    if (!institution) return res.status(404).json({ success: false, message: 'Institution not found' });
+    res.json({ success: true, data: institution });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.createInstitution = async (req, res) => {
+  try {
+    if (req.user.roleLevel < 5) {
+      return res.status(403).json({ success: false, message: 'Only SuperAdmin can create institutions' });
+    }
+    const { name, slug, code, plan, maxUsers, primaryColor, companyName } = req.body;
+    const institution = await Institution.create({
+      name,
+      slug: slug || name.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+      code: code || name.substring(0, 4).toUpperCase(),
+      plan,
+      maxUsers,
+      primaryColor,
+      companyName
+    });
+    res.status(201).json({ success: true, data: institution });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateInstitution = async (req, res) => {
+  try {
+    const instId = req.params.id;
+    if (req.user.roleLevel < 5 && instId.toString() !== req.user.institutionId?.toString()) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+    const institution = await Institution.findByIdAndUpdate(instId, req.body, { new: true });
+    res.json({ success: true, data: institution });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+// --- DEPARTMENT MANAGEMENT ---
+exports.getDepartments = async (req, res) => {
+  try {
+    const instId = req.query.institutionId || req.user.institutionId;
+    const departments = await Department.find({ institutionId: instId }).populate('hodId', 'name email avatar').sort({ name: 1 });
+    res.json({ success: true, count: departments.length, data: departments });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.createDepartment = async (req, res) => {
+  try {
+    const instId = req.body.institutionId || req.user.institutionId;
+    const { name, code, hodId } = req.body;
+    const department = await Department.create({
+      institutionId: instId,
+      name,
+      code: code.toUpperCase(),
+      hodId: hodId || null
+    });
+    res.status(201).json({ success: true, data: department });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateDepartment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const department = await Department.findByIdAndUpdate(id, req.body, { new: true });
+    if (!department) return res.status(404).json({ success: false, message: 'Department not found' });
+    res.json({ success: true, data: department });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteDepartment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Department.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Department deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// --- ACADEMIC YEAR MANAGEMENT ---
+exports.getAcademicYears = async (req, res) => {
+  try {
+    const instId = req.query.institutionId || req.user.institutionId;
+    const years = await AcademicYear.find({ institutionId: instId }).sort({ yearLabel: -1 });
+    res.json({ success: true, count: years.length, data: years });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.createAcademicYear = async (req, res) => {
+  try {
+    const instId = req.body.institutionId || req.user.institutionId;
+    const { yearLabel, startDate, endDate, isCurrent } = req.body;
+    if (isCurrent) {
+      await AcademicYear.updateMany({ institutionId: instId }, { isCurrent: false });
+    }
+    const academicYear = await AcademicYear.create({
+      institutionId: instId,
+      yearLabel,
+      startDate,
+      endDate,
+      isCurrent: isCurrent !== undefined ? isCurrent : true
+    });
+    res.status(201).json({ success: true, data: academicYear });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateAcademicYear = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const year = await AcademicYear.findByIdAndUpdate(id, req.body, { new: true });
+    if (!year) return res.status(404).json({ success: false, message: 'Academic Year not found' });
+    res.json({ success: true, data: year });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteAcademicYear = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await AcademicYear.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Academic Year deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// --- BATCH MANAGEMENT ---
+exports.getBatches = async (req, res) => {
+  try {
+    const instId = req.query.institutionId || req.user.institutionId;
+    const filter = { institutionId: instId };
+    if (req.query.departmentId) filter.departmentId = req.query.departmentId;
+    if (req.query.academicYearId) filter.academicYearId = req.query.academicYearId;
+
+    const batches = await Batch.find(filter)
+      .populate('departmentId', 'name code')
+      .populate('academicYearId', 'yearLabel')
+      .sort({ name: 1 });
+    res.json({ success: true, count: batches.length, data: batches });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.createBatch = async (req, res) => {
+  try {
+    const instId = req.body.institutionId || req.user.institutionId;
+    const { departmentId, academicYearId, name, targetDailySolved, targetWeeklySolved } = req.body;
+    const batch = await Batch.create({
+      institutionId: instId,
+      departmentId,
+      academicYearId,
+      name,
+      targetDailySolved: targetDailySolved || 2,
+      targetWeeklySolved: targetWeeklySolved || 10
+    });
+    res.status(201).json({ success: true, data: batch });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateBatch = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const batch = await Batch.findByIdAndUpdate(id, req.body, { new: true });
+    if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
+    res.json({ success: true, data: batch });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteBatch = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Batch.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Batch deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+// --- SECTION MANAGEMENT ---
+exports.getSections = async (req, res) => {
+  try {
+    const instId = req.query.institutionId || req.user.institutionId;
+    const filter = { institutionId: instId };
+    if (req.query.batchId) filter.batchId = req.query.batchId;
+
+    const sections = await Section.find(filter)
+      .populate('batchId', 'name')
+      .populate('facultyId', 'name email avatar')
+      .sort({ name: 1 });
+    res.json({ success: true, count: sections.length, data: sections });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.createSection = async (req, res) => {
+  try {
+    const instId = req.body.institutionId || req.user.institutionId;
+    const { batchId, name, facultyId } = req.body;
+    const section = await Section.create({
+      institutionId: instId,
+      batchId,
+      name,
+      facultyId: facultyId || null
+    });
+    res.status(201).json({ success: true, data: section });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.updateSection = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const section = await Section.findByIdAndUpdate(id, req.body, { new: true });
+    if (!section) return res.status(404).json({ success: false, message: 'Section not found' });
+    res.json({ success: true, data: section });
+  } catch (err) {
+    res.status(400).json({ success: false, message: err.message });
+  }
+};
+
+exports.deleteSection = async (req, res) => {
+  try {
+    const { id } = req.params;
+    await Section.findByIdAndDelete(id);
+    res.json({ success: true, message: 'Section deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

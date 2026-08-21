@@ -17,7 +17,6 @@ import ProfilePage from './pages/user/ProfilePage';
 
 import AdminDashboard from './pages/admin/AdminDashboard';
 import GroupChallengesPage from './pages/admin/GroupChallengesPage';
-import GroupReportsPage from './pages/admin/GroupReportsPage';
 
 import SuperAdminDashboard from './pages/superadmin/SuperAdminDashboard';
 import AdminManagerPage from './pages/superadmin/AdminManagerPage';
@@ -34,7 +33,13 @@ import NotificationsPage from './pages/shared/NotificationsPage';
 import SettingsPage from './pages/shared/SettingsPage';
 import UserProgressPage from './pages/shared/UserProgressPage';
 
-
+// Multi-Tenant Institutional Pages
+import InstitutionDashboard from './pages/admin/InstitutionDashboard';
+import AcademicHierarchyManager from './pages/admin/AcademicHierarchyManager';
+import StudentManagementPage from './pages/admin/StudentManagementPage';
+import AtRiskStudentPage from './pages/admin/AtRiskStudentPage';
+import FacultyDashboard from './pages/faculty/FacultyDashboard';
+import ReportsPage from './pages/shared/ReportsPage';
 
 const ProtectedRoute = ({ children, minLevel = 1 }) => {
   const { user, loading } = useAuth();
@@ -54,17 +59,18 @@ const DefaultRoleRedirect = () => {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
 
-  switch (user.role) {
-    case 'devadmin':
-      return <Navigate to="/devadmin/health" replace />;
-    case 'superadmin':
-      return <Navigate to="/superadmin/analytics" replace />;
-    case 'admin':
-      return <Navigate to="/admin/overview" replace />;
-    default:
-      return <Navigate to="/dashboard" replace />;
+  if (user.roleLevel >= 6 || user.role === 'devadmin') {
+    return <Navigate to="/devadmin/health" replace />;
   }
+  if (user.roleLevel >= 4 || user.role === 'institution_admin' || user.role === 'hod') {
+    return <Navigate to="/institution/dashboard" replace />;
+  }
+  if (user.roleLevel === 3 || user.role === 'faculty') {
+    return <Navigate to="/faculty/dashboard" replace />;
+  }
+  return <Navigate to="/dashboard" replace />;
 };
+
 
 const AppLayout = ({ children }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = React.useState(false);
@@ -82,7 +88,6 @@ const AppLayout = ({ children }) => {
     </div>
   );
 };
-
 
 function App() {
   return (
@@ -102,17 +107,24 @@ function App() {
               <Route path="/goals" element={<GoalsPage />} />
               <Route path="/profile" element={<ProfilePage />} />
 
+              {/* Multi-Tenant Institution Pages */}
+              <Route path="/institution/dashboard" element={<ProtectedRoute minLevel={3}><InstitutionDashboard /></ProtectedRoute>} />
+              <Route path="/institution/hierarchy" element={<ProtectedRoute minLevel={3}><AcademicHierarchyManager /></ProtectedRoute>} />
+              <Route path="/admin/students" element={<ProtectedRoute minLevel={2}><StudentManagementPage /></ProtectedRoute>} />
+              <Route path="/admin/at-risk" element={<ProtectedRoute minLevel={2}><AtRiskStudentPage /></ProtectedRoute>} />
+              <Route path="/faculty/dashboard" element={<ProtectedRoute minLevel={2}><FacultyDashboard /></ProtectedRoute>} />
+              <Route path="/reports" element={<ProtectedRoute minLevel={2}><ReportsPage /></ProtectedRoute>} />
+
               {/* Admin L2 */}
               <Route path="/admin/overview" element={<ProtectedRoute minLevel={2}><AdminDashboard /></ProtectedRoute>} />
               <Route path="/admin/challenges" element={<ProtectedRoute minLevel={2}><GroupChallengesPage /></ProtectedRoute>} />
-              <Route path="/admin/reports" element={<ProtectedRoute minLevel={2}><GroupReportsPage /></ProtectedRoute>} />
 
-              {/* SuperAdmin L3 */}
+              {/* SuperAdmin L3/L4 */}
               <Route path="/superadmin/analytics" element={<ProtectedRoute minLevel={3}><SuperAdminDashboard /></ProtectedRoute>} />
               <Route path="/superadmin/admins" element={<ProtectedRoute minLevel={3}><AdminManagerPage /></ProtectedRoute>} />
               <Route path="/superadmin/branding" element={<ProtectedRoute minLevel={3}><BrandingBillingPage /></ProtectedRoute>} />
 
-              {/* DevAdmin L4 */}
+              {/* DevAdmin L4/L5 */}
               <Route path="/devadmin/health" element={<ProtectedRoute minLevel={4}><DevAdminDashboard /></ProtectedRoute>} />
               <Route path="/devadmin/feature-flags" element={<ProtectedRoute minLevel={4}><FeatureFlagsPage /></ProtectedRoute>} />
               <Route path="/devadmin/logs" element={<ProtectedRoute minLevel={4}><LogsViewerPage /></ProtectedRoute>} />
@@ -126,8 +138,6 @@ function App() {
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />
 
-
-
               {/* Default redirect */}
               <Route path="*" element={<DefaultRoleRedirect />} />
             </Routes>
@@ -139,3 +149,4 @@ function App() {
 }
 
 export default App;
+
