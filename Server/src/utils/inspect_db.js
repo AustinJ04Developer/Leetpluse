@@ -1,10 +1,10 @@
 const mongoose = require('mongoose');
-require('dotenv').config();
+require('dotenv').config({ path: __dirname + '/../../.env' });
 
 const User = require('../models/User');
 
 async function inspect() {
-  const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/leetpulse';
+  const mongoUri = process.env.MONGODB_URI || process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/leetpulse';
   await mongoose.connect(mongoUri);
   const allUsers = await User.find({});
   console.log('All Users Count:', allUsers.length);

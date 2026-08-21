@@ -13,7 +13,7 @@ const AcademicHierarchyManager = () => {
   // Creation Form states
   const [newDept, setNewDept] = useState({ name: '', code: '' });
   const [newYear, setNewYear] = useState({ yearLabel: '', startDate: '', endDate: '' });
-  const [newBatch, setNewBatch] = useState({ name: '', departmentId: '', academicYearId: '', targetDailySolved: 2 });
+  const [newBatch, setNewBatch] = useState({ name: '', departmentId: 'combined', academicYearId: '', targetDailySolved: 2 });
   const [newSec, setNewSec] = useState({ name: '', batchId: '' });
 
   // Edit states
@@ -123,10 +123,18 @@ const AcademicHierarchyManager = () => {
   // --- BATCH HANDLERS ---
   const handleCreateBatch = async (e) => {
     e.preventDefault();
-    if (!newBatch.name || !newBatch.departmentId || !newBatch.academicYearId) return;
+    if (!newBatch.name || !newBatch.academicYearId) return;
     try {
-      await api.post('/institutions/batches/create', newBatch);
-      setNewBatch({ name: '', departmentId: '', academicYearId: '', targetDailySolved: 2 });
+      const currentDeptIds = newBatch.departmentIds || [];
+      const isCombined = newBatch.departmentId === 'combined' || !newBatch.departmentId || currentDeptIds.length > 0;
+      const payload = {
+        ...newBatch,
+        departmentId: isCombined && newBatch.departmentId === 'combined' ? null : newBatch.departmentId,
+        departmentIds: newBatch.departmentId === 'combined' ? currentDeptIds : (newBatch.departmentId ? [newBatch.departmentId] : []),
+        isCombined
+      };
+      await api.post('/institutions/batches/create', payload);
+      setNewBatch({ name: '', departmentId: 'combined', departmentIds: [], academicYearId: '', targetDailySolved: 2 });
       fetchData();
     } catch (err) {
       alert(err.response?.data?.message || 'Error creating batch');
@@ -334,78 +342,111 @@ const AcademicHierarchyManager = () => {
         </div>
       )}
 
-      {/* Academic Years Tab */}
+      {/* Academic Years & Study Levels Tab */}
       {activeTab === 'academicYears' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <form onSubmit={handleCreateAcademicYear} className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Plus className="w-5 h-5 text-indigo-400" />
-              <span>Add Academic Year</span>
-            </h2>
+        <div className="space-y-4">
+          <div className="p-4 bg-slate-900/60 rounded-2xl border border-slate-800 flex items-center justify-between flex-wrap gap-3">
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Year Label</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. 2026-2027"
-                value={newYear.yearLabel}
-                onChange={e => setNewYear({ ...newYear, yearLabel: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-              />
+              <h3 className="text-sm font-semibold text-white">Quick Add Standard Year Levels</h3>
+              <p className="text-xs text-slate-400">Add standard year of study categories for department hierarchy.</p>
             </div>
-            <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/20">
-              Create Academic Year
-            </button>
-          </form>
+            <div className="flex gap-2 flex-wrap">
+              {[
+                { label: '1st Year (First Year)', level: 1 },
+                { label: '2nd Year (Second Year)', level: 2 },
+                { label: '3rd Year (Pre-Final Year)', level: 3 },
+                { label: '4th Year (Final Year)', level: 4 }
+              ].map(preset => (
+                <button
+                  key={preset.level}
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await api.post('/institutions/academic-years/create', { yearLabel: preset.label, yearLevel: preset.level });
+                      fetchData();
+                    } catch (err) {
+                      alert(err.response?.data?.message || 'Already exists or error creating year level');
+                    }
+                  }}
+                  className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-xl text-xs font-medium transition-all"
+                >
+                  + {preset.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-          <div className="lg:col-span-2 space-y-3">
-            {academicYears.map(y => (
-              <div key={y._id} className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
-                {editingYearId === y._id ? (
-                  <div className="flex-1 flex items-center gap-3 mr-4">
-                    <input
-                      type="text"
-                      value={editYearForm.yearLabel}
-                      onChange={e => setEditYearForm({ yearLabel: e.target.value })}
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
-                    />
-                    <button onClick={() => handleUpdateAcademicYear(y._id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => setEditingYearId(null)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <h3 className="font-semibold text-white text-sm">{y.yearLabel}</h3>
-                    {y.isCurrent && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">CURRENT SESSION</span>}
-                  </div>
-                )}
-
-                {editingYearId !== y._id && (
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => {
-                        setEditingYearId(y._id);
-                        setEditYearForm({ yearLabel: y.yearLabel });
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
-                      title="Edit Academic Year"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteAcademicYear(y._id, y.yearLabel)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                      title="Delete Academic Year"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <form onSubmit={handleCreateAcademicYear} className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Plus className="w-5 h-5 text-indigo-400" />
+                <span>Add Academic Year / Level</span>
+              </h2>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Year Label</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. 3rd Year (Pre-Final Year) or 2026-2027"
+                  value={newYear.yearLabel}
+                  onChange={e => setNewYear({ ...newYear, yearLabel: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
               </div>
-            ))}
+              <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/20">
+                Create Year / Level
+              </button>
+            </form>
+
+            <div className="lg:col-span-2 space-y-3">
+              {academicYears.map(y => (
+                <div key={y._id} className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
+                  {editingYearId === y._id ? (
+                    <div className="flex-1 flex items-center gap-3 mr-4">
+                      <input
+                        type="text"
+                        value={editYearForm.yearLabel}
+                        onChange={e => setEditYearForm({ yearLabel: e.target.value })}
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
+                      />
+                      <button onClick={() => handleUpdateAcademicYear(y._id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setEditingYearId(null)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <h3 className="font-semibold text-white text-sm">{y.yearLabel}</h3>
+                      {y.isCurrent && <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-bold">CURRENT SESSION</span>}
+                    </div>
+                  )}
+
+                  {editingYearId !== y._id && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => {
+                          setEditingYearId(y._id);
+                          setEditYearForm({ yearLabel: y.yearLabel });
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
+                        title="Edit Academic Year"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteAcademicYear(y._id, y.yearLabel)}
+                        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                        title="Delete Academic Year"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}
@@ -423,35 +464,77 @@ const AcademicHierarchyManager = () => {
               <input
                 type="text"
                 required
-                placeholder="e.g. Batch 2026-A"
+                placeholder="e.g. Placement Batch 2026"
                 value={newBatch.name}
                 onChange={e => setNewBatch({ ...newBatch, name: e.target.value })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
               />
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Department</label>
+              <label className="text-xs text-slate-400 mb-1 block">Department Allocation</label>
               <select
-                required
                 value={newBatch.departmentId}
-                onChange={e => setNewBatch({ ...newBatch, departmentId: e.target.value })}
+                onChange={e => setNewBatch({ ...newBatch, departmentId: e.target.value, departmentIds: [] })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="">Select Department</option>
-                {departments.map(d => (
-                  <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
-                ))}
+                <option value="combined">✨ Combined / Integrated Departments (All or Selected)</option>
+                <optgroup label="Single Specific Department">
+                  {departments.map(d => (
+                    <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
+                  ))}
+                </optgroup>
               </select>
+
+              {newBatch.departmentId === 'combined' && (
+                <div className="mt-3 p-3 bg-slate-800/80 rounded-xl border border-slate-700/60 space-y-2">
+                  <label className="text-xs font-semibold text-purple-300 block">Integrate Specific Departments (Optional):</label>
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                    {departments.map(d => {
+                      const currentIds = newBatch.departmentIds || [];
+                      const isSelected = currentIds.includes(d._id);
+                      return (
+                        <label key={d._id} className="flex items-center gap-2 text-xs text-slate-200 cursor-pointer hover:text-white">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={e => {
+                              if (e.target.checked) {
+                                setNewBatch({ ...newBatch, departmentIds: [...currentIds, d._id] });
+                              } else {
+                                setNewBatch({ ...newBatch, departmentIds: currentIds.filter(id => id !== d._id) });
+                              }
+                            }}
+                            className="rounded border-slate-600 text-indigo-600 focus:ring-indigo-500 bg-slate-700"
+                          />
+                          <span>{d.name} <span className="text-slate-400 font-mono">({d.code})</span></span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[10px] text-slate-400">Leave unselected to integrate ALL departments.</p>
+                </div>
+              )}
             </div>
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Academic Year</label>
+              <label className="text-xs text-slate-400 mb-1 block">Degree Cohort (Academic Batch)</label>
+              <input
+                type="text"
+                placeholder="e.g. 2023 - 2027"
+                value={newBatch.cohortRange || ''}
+                onChange={e => setNewBatch({ ...newBatch, cohortRange: e.target.value })}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500 font-mono"
+              />
+              <p className="text-[11px] text-slate-400 mt-1">4-year degree cohort duration (e.g. 2023 - 2027 for Final Year in 2026 - 2027 session).</p>
+            </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Academic Session (Calendar Year)</label>
               <select
                 required
                 value={newBatch.academicYearId}
                 onChange={e => setNewBatch({ ...newBatch, academicYearId: e.target.value })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
               >
-                <option value="">Select Academic Year</option>
+                <option value="">Select Academic Session</option>
                 {academicYears.map(y => (
                   <option key={y._id} value={y._id}>{y.yearLabel}</option>
                 ))}
@@ -463,145 +546,176 @@ const AcademicHierarchyManager = () => {
           </form>
 
           <div className="lg:col-span-2 space-y-3">
-            {batches.map(b => (
-              <div key={b._id} className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
-                {editingBatchId === b._id ? (
-                  <div className="flex-1 flex items-center gap-3 mr-4">
-                    <input
-                      type="text"
-                      value={editBatchForm.name}
-                      onChange={e => setEditBatchForm({ ...editBatchForm, name: e.target.value })}
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
-                    />
-                    <button onClick={() => handleUpdateBatch(b._id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => setEditingBatchId(null)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <h3 className="font-semibold text-white text-sm">{b.name}</h3>
-                    <p className="text-xs text-slate-400">Department: {b.departmentId?.name || 'N/A'}</p>
-                  </div>
-                )}
+            {batches.map(b => {
+              const isCombinedBatch = b.isCombined || !b.departmentId || (b.departmentIds && b.departmentIds.length > 0);
+              let deptName = 'Integrated';
+              if (b.departmentId?.name) {
+                deptName = `${b.departmentId.name} (${b.departmentId.code})`;
+              } else if (b.departmentIds && b.departmentIds.length > 0) {
+                deptName = `Integrated (${b.departmentIds.map(d => d.code || d.name).join(', ')})`;
+              } else {
+                deptName = 'Combined / Integrated (All Departments)';
+              }
 
-                {editingBatchId !== b._id && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-indigo-400 font-medium mr-2">Daily Target: {b.targetDailySolved} Solved</span>
-                    <button
-                      onClick={() => {
-                        setEditingBatchId(b._id);
-                        setEditBatchForm({ name: b.name, targetDailySolved: b.targetDailySolved });
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
-                      title="Edit Batch"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteBatch(b._id, b.name)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                      title="Delete Batch"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
-              </div>
-            ))}
+              return (
+                <div key={b._id} className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
+                  {editingBatchId === b._id ? (
+                    <div className="flex-1 flex items-center gap-3 mr-4">
+                      <input
+                        type="text"
+                        value={editBatchForm.name}
+                        onChange={e => setEditBatchForm({ ...editBatchForm, name: e.target.value })}
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
+                      />
+                      <button onClick={() => handleUpdateBatch(b._id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setEditingBatchId(null)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-white text-sm">{b.name}</h3>
+                        {isCombinedBatch && (
+                          <span className="px-2 py-0.5 text-[10px] font-semibold bg-purple-500/20 text-purple-300 border border-purple-500/30 rounded-full">
+                            Integrated / Combined
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">Department: {deptName}</p>
+                    </div>
+                  )}
+
+                  {editingBatchId !== b._id && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-indigo-400 font-medium mr-2">Daily Target: {b.targetDailySolved} Solved</span>
+                      <button
+                        onClick={() => {
+                          setEditingBatchId(b._id);
+                          setEditBatchForm({ name: b.name, targetDailySolved: b.targetDailySolved });
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
+                        title="Edit Batch"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteBatch(b._id, b.name)}
+                        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                        title="Delete Batch"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
 
       {/* Sections Tab */}
       {activeTab === 'sections' && (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <form onSubmit={handleCreateSection} className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
-            <h2 className="text-lg font-semibold text-white flex items-center gap-2">
-              <Plus className="w-5 h-5 text-indigo-400" />
-              <span>Add Section</span>
-            </h2>
+        <div className="space-y-4">
+          <div className="p-4 bg-indigo-950/40 border border-indigo-800/50 rounded-2xl flex items-start gap-3 text-sm text-indigo-200">
+            <AlertTriangle className="w-5 h-5 text-indigo-400 shrink-0 mt-0.5" />
             <div>
-              <label className="text-xs text-slate-400 mb-1 block">Section Name</label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Section A"
-                value={newSec.name}
-                onChange={e => setNewSec({ ...newSec, name: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-              />
+              <p className="font-semibold text-indigo-100">Sections are Optional</p>
+              <p className="text-xs text-indigo-300/80">Placement is conducted under integrated departments. Sections are not required unless your department/batch specifically requires section-level groupings.</p>
             </div>
-            <div>
-              <label className="text-xs text-slate-400 mb-1 block">Parent Batch</label>
-              <select
-                required
-                value={newSec.batchId}
-                onChange={e => setNewSec({ ...newSec, batchId: e.target.value })}
-                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-              >
-                <option value="">Select Batch</option>
-                {batches.map(b => (
-                  <option key={b._id} value={b._id}>{b.name}</option>
-                ))}
-              </select>
-            </div>
-            <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/20">
-              Create Section
-            </button>
-          </form>
+          </div>
 
-          <div className="lg:col-span-2 space-y-3">
-            {sections.map(s => (
-              <div key={s._id} className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
-                {editingSecId === s._id ? (
-                  <div className="flex-1 flex items-center gap-3 mr-4">
-                    <input
-                      type="text"
-                      value={editSecForm.name}
-                      onChange={e => setEditSecForm({ name: e.target.value })}
-                      className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
-                    />
-                    <button onClick={() => handleUpdateSection(s._id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">
-                      <Check className="w-4 h-4" />
-                    </button>
-                    <button onClick={() => setEditingSecId(null)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg">
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div>
-                    <h3 className="font-semibold text-white text-sm">{s.name}</h3>
-                    <p className="text-xs text-slate-400">Batch: {s.batchId?.name || 'N/A'}</p>
-                  </div>
-                )}
-
-                {editingSecId !== s._id && (
-                  <div className="flex items-center gap-2">
-                    <span className="px-2 py-1 rounded bg-slate-800 text-slate-300 text-xs mr-2">Section</span>
-                    <button
-                      onClick={() => {
-                        setEditingSecId(s._id);
-                        setEditSecForm({ name: s.name });
-                      }}
-                      className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
-                      title="Edit Section"
-                    >
-                      <Edit3 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteSection(s._id, s.name)}
-                      className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
-                      title="Delete Section"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                )}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <form onSubmit={handleCreateSection} className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-4">
+              <h2 className="text-lg font-semibold text-white flex items-center gap-2">
+                <Plus className="w-5 h-5 text-indigo-400" />
+                <span>Add Section</span>
+              </h2>
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Section Name</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Section A"
+                  value={newSec.name}
+                  onChange={e => setNewSec({ ...newSec, name: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                />
               </div>
-            ))}
+              <div>
+                <label className="text-xs text-slate-400 mb-1 block">Parent Batch</label>
+                <select
+                  required
+                  value={newSec.batchId}
+                  onChange={e => setNewSec({ ...newSec, batchId: e.target.value })}
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">Select Parent Batch</option>
+                  {batches.map(b => (
+                    <option key={b._id} value={b._id}>
+                      {b.name} ({b.isCombined || !b.departmentId ? 'Combined Depts' : (b.departmentId?.code || b.departmentId?.name || 'Dept')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button type="submit" className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-xl text-sm transition-all shadow-lg shadow-indigo-600/20">
+                Create Section
+              </button>
+            </form>
+
+            <div className="lg:col-span-2 space-y-3">
+              {sections.map(s => (
+                <div key={s._id} className="p-4 bg-slate-900/60 rounded-xl border border-slate-800 flex items-center justify-between">
+                  {editingSecId === s._id ? (
+                    <div className="flex-1 flex items-center gap-3 mr-4">
+                      <input
+                        type="text"
+                        value={editSecForm.name}
+                        onChange={e => setEditSecForm({ name: e.target.value })}
+                        className="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white"
+                      />
+                      <button onClick={() => handleUpdateSection(s._id)} className="p-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg">
+                        <Check className="w-4 h-4" />
+                      </button>
+                      <button onClick={() => setEditingSecId(null)} className="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-400 rounded-lg">
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ) : (
+                    <div>
+                      <h3 className="font-semibold text-white text-sm">{s.name}</h3>
+                      <p className="text-xs text-slate-400">Batch: {s.batchId?.name || 'N/A'}</p>
+                    </div>
+                  )}
+
+                  {editingSecId !== s._id && (
+                    <div className="flex items-center gap-2">
+                      <span className="px-2 py-1 rounded bg-slate-800 text-slate-300 text-xs mr-2">Section</span>
+                      <button
+                        onClick={() => {
+                          setEditingSecId(s._id);
+                          setEditSecForm({ name: s.name });
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-indigo-400 hover:bg-slate-800 rounded-lg transition-colors"
+                        title="Edit Section"
+                      >
+                        <Edit3 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSection(s._id, s.name)}
+                        className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+                        title="Delete Section"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       )}

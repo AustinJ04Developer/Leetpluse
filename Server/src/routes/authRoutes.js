@@ -11,6 +11,7 @@ router.get('/me', protect, getMe);
 router.get('/sessions', protect, getSessions);
 router.delete('/sessions/:id', protect, revokeSession);
 router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 router.post('/reset-password/:token', resetPassword);
 
 module.exports = router;

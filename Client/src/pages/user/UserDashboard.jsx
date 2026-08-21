@@ -19,11 +19,38 @@ import {
   Calendar, 
   Target,
   Medal,
-  Clock
+  Clock,
+  AlertTriangle
 } from 'lucide-react';
 
 const UserDashboard = () => {
   const { user } = useAuth();
+  const hasUsername = !!user?.leetcodeUsername && user.leetcodeUsername.trim() !== '';
+
+  if (!hasUsername) {
+    if (user?.roleLevel >= 3) {
+      return <Navigate to="/institution/dashboard" replace />;
+    }
+    return (
+      <div className="p-8 max-w-xl mx-auto text-center bg-slate-900/80 rounded-2xl border border-slate-800 space-y-4 my-12 shadow-xl">
+        <AlertTriangle className="w-12 h-12 text-amber-400 mx-auto" />
+        <h2 className="text-xl font-bold text-white">No LeetCode Account Linked</h2>
+        <p className="text-xs text-slate-400 leading-relaxed">
+          Personal coding metrics, problem heatmaps, and progress charts are displayed for accounts with a linked LeetCode username. Placement administrators and institutional managers do not require a personal LeetCode dashboard.
+        </p>
+        <div className="pt-2 flex justify-center gap-3">
+          <Link to="/settings" className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-semibold transition-all">
+            Link LeetCode Username
+          </Link>
+          {user?.roleLevel >= 2 && (
+            <Link to="/admin/students" className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-semibold transition-all">
+              Student Roster
+            </Link>
+          )}
+        </div>
+      </div>
+    );
+  }
 
 
   const { lastSyncEvent } = useSocket();

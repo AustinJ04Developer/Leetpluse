@@ -410,27 +410,39 @@ const forgotPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Email address is required' });
     }
 
-    const normalizedEmail = email.toLowerCase().trim();
+    const normalizedInput = email.toLowerCase().trim();
+    const escapedInput = normalizedInput.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
 
-    let user = await User.findOne({ email: normalizedEmail });
-    if (!user) {
-      user = await User.findOne({ email: { $regex: new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } });
-    }
+    let user = await User.findOne({
+      $or: [
+        { email: normalizedInput },
+        { email: { $regex: new RegExp(`^${escapedInput}$`, 'i') } },
+        { leetcodeUsername: { $regex: new RegExp(`^${escapedInput}$`, 'i') } }
+      ]
+    });
 
     if (!user) {
       return res.status(404).json({ success: false, message: 'No account found with this email address' });
     }
 
-    // Generate token
-    const resetToken = crypto.randomBytes(20).toString('hex');
-    const hashedToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    // Generate 6-digit random passcode
+    const resetCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const hashedToken = crypto.createHash('sha256').update(resetCode).digest('hex');
 
     user.resetPasswordToken = hashedToken;
-    user.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 minutes
+    user.resetPasswordExpire = Date.now() + 15 * 60 * 1000; // 15 minutes
     await user.save();
 
-    const clientUrl = process.env.CLIENT_URL || 'http://localhost:3000';
-    const resetUrl = `${clientUrl}/reset-password/${resetToken}`;
+    console.log(`\n======================================================`);
+    console.log(`🔑 PASSWORD RESET VERIFICATION CODE GENERATED`);
+    console.log(`------------------------------------------------------`);
+    console.log(`Recipient Email:   ${user.email}`);
+    console.log(`6-Digit Passcode:  ${resetCode}`);
+    console.log(`Expires In:        15 Minutes`);
+    console.log(`======================================================\n`);
+
+    const { sendResetPasscodeEmail } = require('../services/emailService');
+    const mailResult = await sendResetPasscodeEmail(user.email, resetCode);
 
     await AuditLog.create({
       actorId: user._id,
@@ -440,9 +452,8 @@ const forgotPassword = async (req, res) => {
 
     res.json({
       success: true,
-      message: 'Password reset link generated successfully.',
-      resetToken,
-      resetUrl
+      message: 'A 6-digit verification code has been sent to your email address.',
+      email: user.email
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
@@ -452,22 +463,36 @@ const forgotPassword = async (req, res) => {
 
 const resetPassword = async (req, res) => {
   try {
-    const { token } = req.params;
-    const { newPassword } = req.body;
+    const tokenOrCode = req.params.token || req.body.code || req.body.token;
+    const { email, newPassword } = req.body;
+
+    if (!tokenOrCode) {
+      return res.status(400).json({ success: false, message: '6-digit verification code is required' });
+    }
 
     if (!newPassword || newPassword.length < 6) {
       return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
     }
 
-    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const hashedToken = crypto.createHash('sha256').update(tokenOrCode.toString().trim()).digest('hex');
 
-    const user = await User.findOne({
+    let filter = {
       resetPasswordToken: hashedToken,
       resetPasswordExpire: { $gt: Date.now() }
-    });
+    };
+
+    if (email) {
+      const normalizedEmail = email.toLowerCase().trim();
+      filter.$or = [
+        { email: normalizedEmail },
+        { email: { $regex: new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
+      ];
+    }
+
+    let user = await User.findOne(filter);
 
     if (!user) {
-      return res.status(400).json({ success: false, message: 'Invalid or expired password reset token' });
+      return res.status(400).json({ success: false, message: 'Invalid or expired 6-digit verification code' });
     }
 
     const salt = await bcrypt.genSalt(10);

@@ -205,7 +205,7 @@ exports.syncStudentStats = async (req, res) => {
 exports.updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, registerNumber, studentId, departmentId, batchId, sectionId, leetcodeUsername, role } = req.body;
+    const { name, email, registerNumber, studentId, departmentId, batchId, sectionId, leetcodeUsername, role, academicBatch, yearLevel } = req.body;
 
     const student = await User.findById(id);
     if (!student) return res.status(404).json({ success: false, message: 'User not found' });
@@ -221,6 +221,8 @@ exports.updateStudent = async (req, res) => {
     if (departmentId !== undefined) student.departmentId = departmentId || null;
     if (batchId !== undefined) student.batchId = batchId || null;
     if (sectionId !== undefined) student.sectionId = sectionId || null;
+    if (academicBatch !== undefined) student.academicBatch = academicBatch || '';
+    if (yearLevel !== undefined) student.yearLevel = Number(yearLevel) || 1;
     if (leetcodeUsername !== undefined) student.leetcodeUsername = leetcodeUsername ? leetcodeUsername.trim() : null;
 
     // --- ROLE UPGRADE LOGIC ---

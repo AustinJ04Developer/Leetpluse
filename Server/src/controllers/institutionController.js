@@ -126,15 +126,17 @@ exports.getAcademicYears = async (req, res) => {
 exports.createAcademicYear = async (req, res) => {
   try {
     const instId = req.body.institutionId || req.user.institutionId;
-    const { yearLabel, startDate, endDate, isCurrent } = req.body;
+    const { yearLabel, displayName, yearLevel, startDate, endDate, isCurrent } = req.body;
     if (isCurrent) {
       await AcademicYear.updateMany({ institutionId: instId }, { isCurrent: false });
     }
     const academicYear = await AcademicYear.create({
       institutionId: instId,
       yearLabel,
-      startDate,
-      endDate,
+      displayName: displayName || yearLabel,
+      yearLevel: yearLevel ? Number(yearLevel) : null,
+      startDate: startDate || null,
+      endDate: endDate || null,
       isCurrent: isCurrent !== undefined ? isCurrent : true
     });
     res.status(201).json({ success: true, data: academicYear });
@@ -169,11 +171,20 @@ exports.getBatches = async (req, res) => {
   try {
     const instId = req.query.institutionId || req.user.institutionId;
     const filter = { institutionId: instId };
-    if (req.query.departmentId) filter.departmentId = req.query.departmentId;
+    if (req.query.departmentId) {
+      filter.$or = [
+        { departmentId: req.query.departmentId },
+        { departmentIds: req.query.departmentId },
+        { isCombined: true },
+        { departmentId: null }
+      ];
+    }
     if (req.query.academicYearId) filter.academicYearId = req.query.academicYearId;
+    if (req.query.targetYearLevel) filter.targetYearLevel = Number(req.query.targetYearLevel);
 
     const batches = await Batch.find(filter)
       .populate('departmentId', 'name code')
+      .populate('departmentIds', 'name code')
       .populate('academicYearId', 'yearLabel')
       .sort({ name: 1 });
     res.json({ success: true, count: batches.length, data: batches });
@@ -185,16 +196,29 @@ exports.getBatches = async (req, res) => {
 exports.createBatch = async (req, res) => {
   try {
     const instId = req.body.institutionId || req.user.institutionId;
-    const { departmentId, academicYearId, name, targetDailySolved, targetWeeklySolved } = req.body;
+    const { departmentId, departmentIds, academicYearId, targetYearLevel, name, targetDailySolved, targetWeeklySolved, isCombined } = req.body;
+    
+    const isCombinedBatch = isCombined || !departmentId || departmentId === 'combined' || (departmentIds && departmentIds.length > 1);
+    const finalDeptId = (departmentId === 'combined' || !departmentId) ? null : departmentId;
+
     const batch = await Batch.create({
       institutionId: instId,
-      departmentId,
+      departmentId: finalDeptId,
+      departmentIds: Array.isArray(departmentIds) ? departmentIds : (finalDeptId ? [finalDeptId] : []),
+      isCombined: isCombinedBatch,
       academicYearId,
+      targetYearLevel: targetYearLevel ? Number(targetYearLevel) : null,
       name,
       targetDailySolved: targetDailySolved || 2,
       targetWeeklySolved: targetWeeklySolved || 10
     });
-    res.status(201).json({ success: true, data: batch });
+
+    const populatedBatch = await Batch.findById(batch._id)
+      .populate('departmentId', 'name code')
+      .populate('departmentIds', 'name code')
+      .populate('academicYearId', 'yearLabel');
+
+    res.status(201).json({ success: true, data: populatedBatch });
   } catch (err) {
     res.status(400).json({ success: false, message: err.message });
   }
@@ -203,7 +227,15 @@ exports.createBatch = async (req, res) => {
 exports.updateBatch = async (req, res) => {
   try {
     const { id } = req.params;
-    const batch = await Batch.findByIdAndUpdate(id, req.body, { new: true });
+    const updateData = { ...req.body };
+    if (updateData.departmentId === 'combined') {
+      updateData.departmentId = null;
+      updateData.isCombined = true;
+    }
+    const batch = await Batch.findByIdAndUpdate(id, updateData, { new: true })
+      .populate('departmentId', 'name code')
+      .populate('departmentIds', 'name code')
+      .populate('academicYearId', 'yearLabel');
     if (!batch) return res.status(404).json({ success: false, message: 'Batch not found' });
     res.json({ success: true, data: batch });
   } catch (err) {

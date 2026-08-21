@@ -28,9 +28,10 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const role = user.role;
   const roleLevel = user.roleLevel || 1;
+  const hasLeetCode = !!user.leetcodeUsername && user.leetcodeUsername.trim() !== '';
 
   const studentNav = [
-    { name: 'My Performance', path: '/dashboard', icon: LayoutDashboard },
+    ...(hasLeetCode ? [{ name: 'My Performance', path: '/dashboard', icon: LayoutDashboard }] : []),
     { name: 'Daily Heatmap', path: '/user-progress', icon: Calendar },
     { name: 'Rankings', path: '/leaderboard', icon: Trophy },
     { name: 'My Goals', path: '/goals', icon: Target },
@@ -38,7 +39,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   ];
 
   const studentRepNav = [
-    { name: 'My Personal Analytics', path: '/dashboard', icon: LayoutDashboard },
+    ...(hasLeetCode ? [{ name: 'My Personal Analytics', path: '/dashboard', icon: LayoutDashboard }] : []),
     { name: 'Class Roster & Students', path: '/admin/students', icon: Users },
     { name: 'Class Standings', path: '/leaderboard', icon: Trophy },
     { name: 'Class Daily Heatmap', path: '/user-progress', icon: Calendar },
@@ -49,6 +50,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const facultyNav = [
     { name: 'Faculty Dashboard', path: '/faculty/dashboard', icon: LayoutDashboard },
+    ...(hasLeetCode ? [{ name: 'My Personal Coding', path: '/dashboard', icon: Activity }] : []),
     { name: 'Assigned Students', path: '/admin/students', icon: Users },
     { name: 'Assign Targets', path: '/goals', icon: Target },
     { name: 'At-Risk Students', path: '/admin/at-risk', icon: AlertTriangle },
@@ -57,6 +59,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const hodNav = [
     { name: 'HOD Overview', path: '/institution/dashboard', icon: Building2 },
+    ...(hasLeetCode ? [{ name: 'My Personal Coding', path: '/dashboard', icon: Activity }] : []),
     { name: 'Department Batches', path: '/institution/hierarchy', icon: Layers },
     { name: 'Department Students', path: '/admin/students', icon: GraduationCap },
     { name: 'Faculty & Targets', path: '/faculty/dashboard', icon: Users },
@@ -66,6 +69,7 @@ const Sidebar = ({ isOpen, onClose }) => {
 
   const instAdminNav = [
     { name: 'Institution Overview', path: '/institution/dashboard', icon: Building2 },
+    ...(hasLeetCode ? [{ name: 'My Personal Coding', path: '/dashboard', icon: Activity }] : []),
     { name: 'Academic Hierarchy', path: '/institution/hierarchy', icon: Layers },
     { name: 'Student Roster', path: '/admin/students', icon: GraduationCap },
     { name: 'At-Risk Monitor', path: '/admin/at-risk', icon: AlertTriangle },

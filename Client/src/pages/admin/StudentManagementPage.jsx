@@ -98,6 +98,8 @@ const StudentManagementPage = () => {
       departmentId: student.departmentId?._id || student.departmentId || '',
       batchId: student.batchId?._id || student.batchId || '',
       sectionId: student.sectionId?._id || student.sectionId || '',
+      academicBatch: student.academicBatch || '',
+      yearLevel: student.yearLevel || 1,
       leetcodeUsername: student.leetcodeUsername || '',
       role: student.role || 'student'
     });
@@ -354,6 +356,32 @@ const StudentManagementPage = () => {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Academic Batch (Cohort)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 2023 - 2027"
+                    value={editForm.academicBatch || ''}
+                    onChange={e => setEditForm({ ...editForm, academicBatch: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500 font-mono"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Year Level</label>
+                  <select
+                    value={editForm.yearLevel || 1}
+                    onChange={e => setEditForm({ ...editForm, yearLevel: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-xl text-xs text-white focus:outline-none focus:border-indigo-500"
+                  >
+                    <option value="1">1st Year (First Year)</option>
+                    <option value="2">2nd Year (Second Year)</option>
+                    <option value="3">3rd Year (Pre-Final Year)</option>
+                    <option value="4">4th Year (Final Year)</option>
+                  </select>
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-300 mb-1">Department</label>
@@ -369,7 +397,7 @@ const StudentManagementPage = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-slate-300 mb-1">Batch</label>
+                  <label className="block text-xs font-semibold text-slate-300 mb-1">Placement Batch</label>
                   <select
                     value={editForm.batchId}
                     onChange={e => setEditForm({ ...editForm, batchId: e.target.value })}

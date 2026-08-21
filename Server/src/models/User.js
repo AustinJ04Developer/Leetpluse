@@ -32,6 +32,8 @@ const userSchema = new mongoose.Schema({
   registerNumber: { type: String, default: '' },
   phone: { type: String, default: '' },
   semester: { type: Number, default: 1 },
+  yearLevel: { type: Number, enum: [1, 2, 3, 4], default: 1 }, // 1=1st Year, 2=2nd Year, 3=3rd Year (Pre-Final), 4=4th Year (Final)
+  academicBatch: { type: String, default: '' }, // e.g. "2023-2027" (Degree Cohort)
 
   leetcodeUsername: { type: String, default: null },
   avatar: { type: String, default: '' },
