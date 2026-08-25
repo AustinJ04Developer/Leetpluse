@@ -22,7 +22,10 @@ const {
   getSections,
   createSection,
   updateSection,
-  deleteSection
+  deleteSection,
+  getPendingApprovals,
+  approveUser,
+  rejectUser
 } = require('../controllers/institutionController');
 
 router.use(protect);
@@ -33,6 +36,11 @@ router.get('/', getAllInstitutions);
 router.get('/:id', getInstitutionById);
 router.post('/', requireRoleLevel(6), createInstitution);
 router.put('/:id', requireRoleLevel(5), updateInstitution);
+
+// Pending Approvals & User Grant
+router.get('/pending-approvals', requireRoleLevel(3), getPendingApprovals);
+router.post('/approve-user/:id', requireRoleLevel(3), approveUser);
+router.post('/reject-user/:id', requireRoleLevel(3), rejectUser);
 
 // Departments
 router.get('/departments/list', getDepartments);

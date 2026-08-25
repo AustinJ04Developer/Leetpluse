@@ -307,3 +307,114 @@ exports.deleteSection = async (req, res) => {
   }
 };
 
+// --- APPROVAL WORKFLOW MANAGEMENT ---
+exports.getPendingApprovals = async (req, res) => {
+  try {
+    const instId = req.user.institutionId;
+    let filter = { institutionId: instId, approvalStatus: 'pending' };
+
+    // HOD (Level 4) can approve staff & students in their department
+    if (req.user.roleLevel === 4 && req.user.departmentId) {
+      filter.departmentId = req.user.departmentId;
+    }
+    // Faculty/Staff (Level 3) can approve students in their section/department
+    if (req.user.roleLevel === 3) {
+      filter.role = 'student';
+      if (req.user.departmentId) filter.departmentId = req.user.departmentId;
+    }
+
+    const pendingUsers = await User.find(filter)
+      .populate('departmentId', 'name code')
+      .populate('sectionId', 'name')
+      .sort({ createdAt: -1 });
+
+    res.json({ success: true, count: pendingUsers.length, data: pendingUsers });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.approveUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Role-level authority check
+    if (req.user.roleLevel < 5) {
+      if (req.user.roleLevel === 4) {
+        if (targetUser.roleLevel >= 4 || targetUser.departmentId?.toString() !== req.user.departmentId?.toString()) {
+          return res.status(403).json({ success: false, message: 'Forbidden: HOD can only approve Staff and Students in their department' });
+        }
+      } else if (req.user.roleLevel === 3) {
+        if (targetUser.role !== 'student') {
+          return res.status(403).json({ success: false, message: 'Forbidden: Staff can only approve Students' });
+        }
+      } else {
+        return res.status(403).json({ success: false, message: 'Forbidden: Insufficient privileges' });
+      }
+    }
+
+    targetUser.isApproved = true;
+    targetUser.approvalStatus = 'approved';
+    targetUser.approvedBy = req.user._id;
+    targetUser.approvedAt = new Date();
+    await targetUser.save();
+
+    // Link HOD to Department if role is HOD
+    if (targetUser.role === 'hod' && targetUser.departmentId) {
+      await Department.findByIdAndUpdate(targetUser.departmentId, { hodId: targetUser._id });
+    }
+
+    // Link Faculty to Section if role is Faculty
+    if (targetUser.role === 'faculty' && targetUser.sectionId) {
+      await Section.findByIdAndUpdate(targetUser.sectionId, { facultyId: targetUser._id });
+    }
+
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
+      actorId: req.user._id,
+      actorEmail: req.user.email,
+      action: 'USER_REGISTRATION_APPROVED',
+      metadata: { targetUserId: targetUser._id, role: targetUser.role }
+    });
+
+    res.json({ success: true, message: `${targetUser.name}'s account has been approved successfully!`, data: targetUser });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+exports.rejectUser = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const targetUser = await User.findById(id);
+    if (!targetUser) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    if (req.user.roleLevel < 5 && req.user.roleLevel <= targetUser.roleLevel) {
+      return res.status(403).json({ success: false, message: 'Forbidden: Insufficient privileges to reject this user' });
+    }
+
+    targetUser.isApproved = false;
+    targetUser.approvalStatus = 'rejected';
+    targetUser.isActive = false;
+    await targetUser.save();
+
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
+      actorId: req.user._id,
+      actorEmail: req.user.email,
+      action: 'USER_REGISTRATION_REJECTED',
+      metadata: { targetUserId: targetUser._id, role: targetUser.role }
+    });
+
+    res.json({ success: true, message: `${targetUser.name}'s registration has been rejected.`, data: targetUser });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+

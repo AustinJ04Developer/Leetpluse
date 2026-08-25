@@ -22,8 +22,11 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/forgot-password', { email });
+      const res = await api.post('/auth/forgot-password', { email: email.trim() });
       if (res.data.success) {
+        if (res.data.email) {
+          setEmail(res.data.email);
+        }
         setSuccessMessage(res.data.message || 'Verification code sent to your email.');
         setStep(2);
       }
@@ -39,7 +42,8 @@ const ForgotPassword = () => {
     e.preventDefault();
     setError('');
 
-    if (!code || code.trim().length < 6) {
+    const cleanCode = code.trim().replace(/\s+/g, '');
+    if (!cleanCode || cleanCode.length < 6) {
       return setError('Please enter the full 6-digit verification code.');
     }
 
@@ -54,7 +58,7 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
-      const res = await api.post('/auth/reset-password', { email, code: code.trim(), newPassword });
+      const res = await api.post('/auth/reset-password', { email: email.trim(), code: cleanCode, newPassword });
       if (res.data.success) {
         setSuccessMessage(res.data.message || 'Password reset successfully!');
         setStep(3);
@@ -80,7 +84,7 @@ const ForgotPassword = () => {
             {step === 1 ? 'Forgot Password' : step === 2 ? 'Enter 6-Digit Passcode' : 'Password Reset Complete'}
           </h2>
           <p className="text-xs text-slate-400 mt-1 font-medium">
-            {step === 1 && 'Enter your email to receive a 6-digit verification code'}
+            {step === 1 && 'Enter your registered email or LeetCode username'}
             {step === 2 && `We sent a 6-digit passcode to ${email}`}
             {step === 3 && 'Your account password has been updated successfully'}
           </p>
@@ -96,23 +100,23 @@ const ForgotPassword = () => {
         {step === 1 && (
           <form onSubmit={handleRequestCode} className="space-y-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Email Address or Username</label>
               <div className="relative">
                 <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
                 <input
-                  type="email"
+                  type="text"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-sm text-white placeholder-slate-500 transition-all outline-none"
-                  placeholder="name@company.com"
+                  placeholder="name@company.com or username"
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !email.trim()}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {loading ? 'Sending Code...' : 'Send 6-Digit Passcode'}
@@ -181,7 +185,7 @@ const ForgotPassword = () => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || code.trim().length < 6}
               className="w-full py-3 rounded-xl bg-gradient-to-r from-indigo-600 via-purple-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold text-sm shadow-lg shadow-indigo-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50"
             >
               {loading ? 'Verifying Code...' : 'Verify & Reset Password'}
@@ -191,7 +195,11 @@ const ForgotPassword = () => {
             <div className="text-center pt-1">
               <button
                 type="button"
-                onClick={() => setStep(1)}
+                onClick={() => {
+                  setError('');
+                  setCode('');
+                  setStep(1);
+                }}
                 className="text-xs text-slate-400 hover:text-white underline"
               >
                 Change Email / Resend Code

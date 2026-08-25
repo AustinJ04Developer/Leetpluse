@@ -376,10 +376,10 @@ const registerInstitution = async (req, res) => {
 
 const registerStaff = async (req, res) => {
   try {
-    const { name, email, password, targetRole, institutionId, departmentId, sectionId, staffPasscode } = req.body;
+    const { name, email, password, targetRole, institutionId, departmentId, sectionId, staffPasscode, designation, staffId } = req.body;
 
-    if (!name || !email || !password || !targetRole || !institutionId || !staffPasscode) {
-      return res.status(400).json({ success: false, message: 'Name, Email, Password, Target Role, Institution, and Staff Security Passcode are required.' });
+    if (!name || !email || !password || !targetRole || !institutionId) {
+      return res.status(400).json({ success: false, message: 'Name, Email, Password, Target Role, and Institution are required.' });
     }
 
     const Institution = require('../models/Institution');
@@ -391,11 +391,13 @@ const registerStaff = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Institution not found.' });
     }
 
-    // Verify Staff Security Passcode
+    // Verify Staff Security Passcode if provided
     const validPasscode = institution.staffPasscode || 'STAFF2026';
-    if (staffPasscode.trim() !== validPasscode.trim()) {
-      return res.status(400).json({ success: false, message: 'Invalid Institutional Staff Security Passcode. Contact your Institution Admin.' });
-    }
+    const isPasscodeValid = staffPasscode && staffPasscode.trim() === validPasscode.trim();
+
+    // If valid passcode is provided, auto-approve; otherwise set pending approval
+    const isApproved = Boolean(isPasscodeValid);
+    const approvalStatus = isApproved ? 'approved' : 'pending';
 
     const normalizedEmail = email.toLowerCase().trim();
     const existingUser = await User.findOne({ email: normalizedEmail });
@@ -418,17 +420,20 @@ const registerStaff = async (req, res) => {
       roleLevel,
       institutionId: institution._id,
       departmentId: departmentId || null,
-      sectionId: sectionId || null
+      sectionId: sectionId || null,
+      designation: designation || (finalRole === 'hod' ? 'Head of Department' : 'Faculty Mentor'),
+      studentId: staffId || '',
+      isApproved,
+      approvalStatus
     });
 
-    // If registering as HOD, link to Department
-    if (finalRole === 'hod' && departmentId) {
-      await Department.findByIdAndUpdate(departmentId, { hodId: staffUser._id });
-    }
-
-    // If registering as Faculty, link to Section
-    if (finalRole === 'faculty' && sectionId) {
-      await Section.findByIdAndUpdate(sectionId, { facultyId: staffUser._id });
+    if (isApproved) {
+      if (finalRole === 'hod' && departmentId) {
+        await Department.findByIdAndUpdate(departmentId, { hodId: staffUser._id });
+      }
+      if (finalRole === 'faculty' && sectionId) {
+        await Section.findByIdAndUpdate(sectionId, { facultyId: staffUser._id });
+      }
     }
 
     const { token } = generateTokens(staffUser);
@@ -443,12 +448,68 @@ const registerStaff = async (req, res) => {
       actorId: staffUser._id,
       actorEmail: staffUser.email,
       action: 'STAFF_REGISTERED',
-      metadata: { role: finalRole, departmentId }
+      metadata: { role: finalRole, departmentId, isApproved }
     });
+
+    // Send email notification for pending approval
+    if (!isApproved) {
+      const { sendPendingApprovalNotificationEmail } = require('../services/emailService');
+      let targetRecipientEmail = null;
+      let targetRecipientRole = 'Institution Administrator';
+
+      if (finalRole === 'hod') {
+        // HOD Registration -> Notify Institutional Admin
+        const instAdmin = await User.findOne({ institutionId: institution._id, role: 'institution_admin' });
+        if (instAdmin && instAdmin.email) {
+          targetRecipientEmail = instAdmin.email;
+        } else {
+          targetRecipientEmail = institution.contactEmail || null;
+        }
+      } else {
+        // Faculty/Staff Registration -> Notify Head of Department (HOD)
+        let deptObj = null;
+        if (departmentId) {
+          deptObj = await Department.findById(departmentId).populate('hodId');
+        }
+
+        if (deptObj && deptObj.hodId && deptObj.hodId.email) {
+          targetRecipientEmail = deptObj.hodId.email;
+          targetRecipientRole = `Head of Department (${deptObj.name})`;
+        } else {
+          // Fallback to Institutional Admin if department has no assigned HOD yet
+          const instAdmin = await User.findOne({ institutionId: institution._id, role: 'institution_admin' });
+          if (instAdmin && instAdmin.email) {
+            targetRecipientEmail = instAdmin.email;
+          } else {
+            targetRecipientEmail = institution.contactEmail || null;
+          }
+        }
+      }
+
+      if (targetRecipientEmail) {
+        let deptName = '';
+        if (departmentId) {
+          const dept = await Department.findById(departmentId);
+          if (dept) deptName = dept.name;
+        }
+        sendPendingApprovalNotificationEmail({
+          toEmail: targetRecipientEmail,
+          approverRole: targetRecipientRole,
+          applicantName: staffUser.name,
+          applicantEmail: staffUser.email,
+          applicantRole: finalRole,
+          departmentName: deptName,
+          institutionName: institution.name
+        }).catch(err => console.error('Failed to send pending approval email:', err));
+      }
+    }
 
     res.status(201).json({
       success: true,
-      message: `${finalRole.toUpperCase()} account registered successfully`,
+      message: isApproved 
+        ? `${finalRole.toUpperCase()} account registered successfully!` 
+        : `${finalRole.toUpperCase()} registration submitted. Account is pending approval by your Institution Admin or HOD.`,
+      isApproved,
       token,
       user: {
         id: staffUser._id,
@@ -458,7 +519,9 @@ const registerStaff = async (req, res) => {
         roleLevel: staffUser.roleLevel,
         institutionId: staffUser.institutionId,
         departmentId: staffUser.departmentId,
-        sectionId: staffUser.sectionId
+        sectionId: staffUser.sectionId,
+        isApproved: staffUser.isApproved,
+        approvalStatus: staffUser.approvalStatus
       }
     });
   } catch (err) {
@@ -500,6 +563,14 @@ const login = async (req, res) => {
 
     if (!user.isActive) {
       return res.status(403).json({ success: false, message: 'Account is deactivated' });
+    }
+
+    if (user.isApproved === false || user.approvalStatus === 'pending') {
+      return res.status(403).json({ success: false, message: 'Account registration is pending approval by your Institution Admin or HOD.' });
+    }
+
+    if (user.approvalStatus === 'rejected') {
+      return res.status(403).json({ success: false, message: 'Account registration has been rejected. Contact your Institution Admin.' });
     }
 
     user.lastActive = new Date();
@@ -646,7 +717,7 @@ const forgotPassword = async (req, res) => {
   try {
     const { email } = req.body;
     if (!email) {
-      return res.status(400).json({ success: false, message: 'Email address is required' });
+      return res.status(400).json({ success: false, message: 'Email address or username is required' });
     }
 
     const normalizedInput = email.toLowerCase().trim();
@@ -661,7 +732,11 @@ const forgotPassword = async (req, res) => {
     });
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'No account found with this email address' });
+      return res.status(404).json({ success: false, message: 'No account found with this email or username' });
+    }
+
+    if (!user.isActive) {
+      return res.status(403).json({ success: false, message: 'Account is deactivated. Please contact support or administrator.' });
     }
 
     // Generate 6-digit random passcode
@@ -681,7 +756,7 @@ const forgotPassword = async (req, res) => {
     console.log(`======================================================\n`);
 
     const { sendResetPasscodeEmail } = require('../services/emailService');
-    const mailResult = await sendResetPasscodeEmail(user.email, resetCode);
+    await sendResetPasscodeEmail(user.email, resetCode);
 
     await AuditLog.create({
       actorId: user._id,
@@ -713,7 +788,8 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'New password must be at least 6 characters' });
     }
 
-    const hashedToken = crypto.createHash('sha256').update(tokenOrCode.toString().trim()).digest('hex');
+    const cleanTokenOrCode = tokenOrCode.toString().replace(/\s+/g, '');
+    const hashedToken = crypto.createHash('sha256').update(cleanTokenOrCode).digest('hex');
 
     let filter = {
       resetPasswordToken: hashedToken,
@@ -721,10 +797,12 @@ const resetPassword = async (req, res) => {
     };
 
     if (email) {
-      const normalizedEmail = email.toLowerCase().trim();
+      const normalizedInput = email.toLowerCase().trim();
+      const escapedInput = normalizedInput.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&');
       filter.$or = [
-        { email: normalizedEmail },
-        { email: { $regex: new RegExp(`^${normalizedEmail.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}$`, 'i') } }
+        { email: normalizedInput },
+        { email: { $regex: new RegExp(`^${escapedInput}$`, 'i') } },
+        { leetcodeUsername: { $regex: new RegExp(`^${escapedInput}$`, 'i') } }
       ];
     }
 
@@ -734,11 +812,18 @@ const resetPassword = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid or expired 6-digit verification code' });
     }
 
+    if (!user.isActive) {
+      return res.status(403).json({ success: false, message: 'Account is deactivated. Cannot reset password.' });
+    }
+
     const salt = await bcrypt.genSalt(10);
     user.passwordHash = await bcrypt.hash(newPassword, salt);
     user.resetPasswordToken = null;
     user.resetPasswordExpire = null;
     await user.save();
+
+    // Revoke all existing sessions for security
+    await Session.updateMany({ userId: user._id }, { isRevoked: true });
 
     await AuditLog.create({
       actorId: user._id,

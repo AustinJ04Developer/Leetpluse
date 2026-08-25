@@ -28,7 +28,8 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      const res = await api.post(`/auth/reset-password/${token}`, { newPassword });
+      const cleanToken = (token || '').trim();
+      const res = await api.post(`/auth/reset-password/${cleanToken}`, { newPassword });
       if (res.data.success) {
         setSuccess(true);
         setTimeout(() => {

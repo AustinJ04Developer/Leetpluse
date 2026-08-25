@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { Link, useNavigate } from 'react-router-dom';
-import { Code2, Lock, Mail, User as UserIcon, Code, ArrowRight, Eye, EyeOff, Building2, GraduationCap, Hash, Globe, MapPin } from 'lucide-react';
+import { Code2, Lock, Mail, User as UserIcon, Code, ArrowRight, Eye, EyeOff, Building2, GraduationCap, Hash, Globe, MapPin, Briefcase, ShieldCheck, CheckCircle2 } from 'lucide-react';
 import api from '../../services/api';
 
 const Register = () => {
-  const [activeTab, setActiveTab] = useState('student'); // 'student' | 'institution'
+  const [activeTab, setActiveTab] = useState('student'); // 'student' | 'staff' | 'institution'
   
   // Dynamic Options Loaded from Server
   const [institutions, setInstitutions] = useState([]);
@@ -40,7 +40,20 @@ const Register = () => {
   const [semester, setSemester] = useState(1);
 
   const [academicStatus, setAcademicStatus] = useState('Pursuing');
-  const [cohortCustom, setCohortCustom] = useState(''); // Optional!
+  const [cohortCustom, setCohortCustom] = useState('');
+
+  // Staff / HOD Form State
+  const [staffName, setStaffName] = useState('');
+  const [staffEmail, setStaffEmail] = useState('');
+  const [staffPassword, setStaffPassword] = useState('');
+  const [targetRole, setTargetRole] = useState('faculty'); // 'hod' | 'faculty'
+  const [staffInstId, setStaffInstId] = useState('');
+  const [staffDeptId, setStaffDeptId] = useState('');
+  const [staffSecId, setStaffSecId] = useState('');
+  const [staffDesignation, setStaffDesignation] = useState('');
+  const [staffEmpId, setStaffEmpId] = useState('');
+  const [staffPasscode, setStaffPasscode] = useState('');
+  const [pendingApprovalMsg, setPendingApprovalMsg] = useState('');
 
   // Institution Form State
   const [instName, setInstName] = useState('');
@@ -71,6 +84,9 @@ const Register = () => {
           if (!institutionId && selectedInstitutionId) {
             setInstitutionId(selectedInstitutionId);
           }
+          if (!staffInstId && selectedInstitutionId) {
+            setStaffInstId(selectedInstitutionId);
+          }
           setDepartments(depts || []);
           setAcademicYears(years || []);
           setBatches(bts || []);
@@ -83,8 +99,8 @@ const Register = () => {
   };
 
   useEffect(() => {
-    fetchRegistrationOptions(institutionId);
-  }, [institutionId]);
+    fetchRegistrationOptions(activeTab === 'staff' ? staffInstId : institutionId);
+  }, [institutionId, staffInstId, activeTab]);
 
   const handleStudentSubmit = async (e) => {
     e.preventDefault();
@@ -139,7 +155,7 @@ const Register = () => {
         yearLevel: Number(yearLevel),
         semester: Number(semester),
         academicStatus,
-        cohortCustom, // Optional!
+        cohortCustom,
         registerNumber,
         studentId
       };
@@ -155,6 +171,52 @@ const Register = () => {
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration error occurred');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleStaffSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+    setPendingApprovalMsg('');
+    setLoading(true);
+
+    try {
+      if (!staffName || !staffEmail || !staffPassword || !targetRole || !staffInstId || !staffDeptId) {
+        setError('Full Name, Email, Password, Target Role, Institution, and Department are required.');
+        setLoading(false);
+        return;
+      }
+
+      const payload = {
+        name: staffName,
+        email: staffEmail,
+        password: staffPassword,
+        targetRole,
+        institutionId: staffInstId,
+        departmentId: staffDeptId,
+        sectionId: staffSecId || null,
+        designation: staffDesignation,
+        staffId: staffEmpId,
+        staffPasscode: staffPasscode
+      };
+
+      const res = await api.post('/auth/register-staff', payload);
+
+      if (res.data.success) {
+        if (res.data.isApproved) {
+          localStorage.setItem('token', res.data.token);
+          await refreshUser();
+          navigate(targetRole === 'hod' ? '/institution/dashboard' : '/faculty/dashboard');
+        } else {
+          setPendingApprovalMsg(res.data.message || 'Registration submitted! Your account is pending approval by your Institution Admin or HOD.');
+        }
+      } else {
+        setError(res.data.message || 'Staff registration failed');
+      }
+    } catch (err) {
+      setError(err.response?.data?.message || 'Staff registration error occurred');
     } finally {
       setLoading(false);
     }
@@ -199,31 +261,42 @@ const Register = () => {
             <Code2 className="w-6 h-6" />
           </div>
           <h2 className="text-2xl font-extrabold text-white tracking-tight">Create Platform Account</h2>
-          <p className="text-xs text-slate-400 mt-1 font-medium">Join LeetPulse Academic Monitoring SaaS</p>
+          <p className="text-xs text-slate-400 mt-1 font-medium">Join LeetPulse Academic Monitoring Platform</p>
         </div>
 
-        {/* Tab Selection: Student vs Institution Registration */}
-        <div className="flex p-1 rounded-2xl bg-slate-900 border border-slate-800 mb-6">
+        {/* Tab Selection: Student vs Staff/HOD vs Institution Registration */}
+        <div className="flex p-1 rounded-2xl bg-slate-900 border border-slate-800 mb-6 gap-1">
           <button
             type="button"
-            onClick={() => { setActiveTab('student'); setError(''); }}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            onClick={() => { setActiveTab('student'); setError(''); setPendingApprovalMsg(''); }}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'student' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
             }`}
           >
             <GraduationCap className="w-4 h-4" />
-            <span>Student / User Registration</span>
+            <span>Student</span>
           </button>
 
           <button
             type="button"
-            onClick={() => { setActiveTab('institution'); setError(''); }}
-            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2 ${
+            onClick={() => { setActiveTab('staff'); setError(''); setPendingApprovalMsg(''); }}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              activeTab === 'staff' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Briefcase className="w-4 h-4" />
+            <span>HOD / Staff</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => { setActiveTab('institution'); setError(''); setPendingApprovalMsg(''); }}
+            className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
               activeTab === 'institution' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'
             }`}
           >
             <Building2 className="w-4 h-4" />
-            <span>Register Institution / College</span>
+            <span>Institution Admin</span>
           </button>
         </div>
 
@@ -233,8 +306,19 @@ const Register = () => {
           </div>
         )}
 
-        {/* FORM 1: STUDENT / USER REGISTRATION */}
-        {activeTab === 'student' && (
+        {pendingApprovalMsg && (
+          <div className="mb-6 p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs font-semibold text-center space-y-2">
+            <ShieldCheck className="w-8 h-8 text-amber-400 mx-auto" />
+            <p className="text-sm font-bold text-white">Registration Submitted Successfully!</p>
+            <p className="text-slate-300 font-normal">{pendingApprovalMsg}</p>
+            <Link to="/login" className="inline-block mt-2 px-4 py-2 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold transition-all">
+              Return to Sign In
+            </Link>
+          </div>
+        )}
+
+        {/* FORM 1: STUDENT REGISTRATION */}
+        {!pendingApprovalMsg && activeTab === 'student' && (
           <form onSubmit={handleStudentSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
@@ -312,9 +396,8 @@ const Register = () => {
               </select>
             </div>
 
-            {/* Dual Select / Type: Department & Academic Year */}
+            {/* Department & Academic Year */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Department */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
                   <span>Department</span>
@@ -343,7 +426,6 @@ const Register = () => {
                 )}
               </div>
 
-              {/* Academic Year */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
                   <span>Academic Year</span>
@@ -364,7 +446,7 @@ const Register = () => {
                   <input
                     type="text"
                     required
-                    placeholder="Enter Year (e.g. 2026-2027 or 3rd Year)"
+                    placeholder="Enter Year (e.g. 2026-2027)"
                     value={academicYearCustom}
                     onChange={(e) => setAcademicYearCustom(e.target.value)}
                     className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-indigo-500/50 text-xs text-white placeholder-slate-500 outline-none focus:ring-1 focus:ring-indigo-500 animate-fadeIn"
@@ -373,7 +455,7 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Academic Status & Academic Batch (4-Year Range) */}
+            {/* Academic Status & Academic Batch */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Academic Status</label>
@@ -387,10 +469,9 @@ const Register = () => {
                 </select>
               </div>
 
-              {/* Academic Batch (4 Years Range e.g. 2023 - 2027) */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
-                  <span>Academic Batch (Degree 4-Year Range)</span>
+                  <span>Academic Batch (4-Year Range)</span>
                   <span className="text-[10px] text-indigo-400 font-normal">Select or Type</span>
                 </label>
                 <select
@@ -417,7 +498,7 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Section & Academic Cohort (Special Team / Group - OPTIONAL) */}
+            {/* Section & Cohort */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
@@ -446,15 +527,14 @@ const Register = () => {
                 )}
               </div>
 
-              {/* Academic Cohort (Special Training Team / Group - NOT MANDATORY) */}
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
-                  <span>Academic Cohort (Special Teams / Groups)</span>
+                  <span>Academic Cohort</span>
                   <span className="text-[10px] text-emerald-400 font-semibold">Optional</span>
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. Elite Training Batch, MPM Batch (Optional)"
+                  placeholder="e.g. Elite Training Batch (Optional)"
                   value={cohortCustom}
                   onChange={(e) => setCohortCustom(e.target.value)}
                   className="w-full px-3.5 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-xs text-white placeholder-slate-500 outline-none"
@@ -462,7 +542,7 @@ const Register = () => {
               </div>
             </div>
 
-            {/* Mapped Year Level & Semester Selectors (1 Year = 2 Semesters Rule) */}
+            {/* Year Level & Semester */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-300 mb-1">Year Level</label>
@@ -487,7 +567,7 @@ const Register = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1">Semester (Mapped to Year {yearLevel})</label>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Semester</label>
                 <select
                   value={semester}
                   onChange={(e) => {
@@ -552,8 +632,200 @@ const Register = () => {
           </form>
         )}
 
-        {/* FORM 2: INSTITUTION REGISTRATION */}
-        {activeTab === 'institution' && (
+        {/* FORM 2: STAFF & HOD REGISTRATION */}
+        {!pendingApprovalMsg && activeTab === 'staff' && (
+          <form onSubmit={handleStaffSubmit} className="space-y-4">
+            {/* Target Role Selection */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Institutional Role</label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setTargetRole('faculty')}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    targetRole === 'faculty' 
+                      ? 'bg-indigo-600/20 border-indigo-500 text-white' 
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <p className="text-xs font-bold">Faculty / Staff Instructor</p>
+                  <p className="text-[10px] text-slate-400">Mentors students & manages sections (Level 3)</p>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetRole('hod')}
+                  className={`p-3 rounded-xl border text-left transition-all ${
+                    targetRole === 'hod' 
+                      ? 'bg-purple-600/20 border-purple-500 text-white' 
+                      : 'bg-slate-900 border-slate-800 text-slate-400 hover:text-white'
+                  }`}
+                >
+                  <p className="text-xs font-bold">Head of Department (HOD)</p>
+                  <p className="text-[10px] text-slate-400">Leads department & manages staff (Level 4)</p>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Full Name</label>
+                <div className="relative">
+                  <UserIcon className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
+                  <input
+                    type="text"
+                    required
+                    value={staffName}
+                    onChange={(e) => setStaffName(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-sm text-white placeholder-slate-500 outline-none"
+                    placeholder="Prof. Robert Vance"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Institutional Email</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
+                  <input
+                    type="email"
+                    required
+                    value={staffEmail}
+                    onChange={(e) => setStaffEmail(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-sm text-white placeholder-slate-500 outline-none"
+                    placeholder="r.vance@college.edu"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Designation / Title</label>
+                <input
+                  type="text"
+                  placeholder="e.g. Associate Professor / HOD"
+                  value={staffDesignation}
+                  onChange={(e) => setStaffDesignation(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-sm text-white placeholder-slate-500 outline-none"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Employee / Staff ID</label>
+                <input
+                  type="text"
+                  placeholder="e.g. EMP-2026-88"
+                  value={staffEmpId}
+                  onChange={(e) => setStaffEmpId(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-sm text-white placeholder-slate-500 outline-none font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Institution & Department */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Institution</label>
+                <select
+                  value={staffInstId}
+                  onChange={(e) => setStaffInstId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500"
+                >
+                  <option value="">Select Institution</option>
+                  {institutions.map(inst => (
+                    <option key={inst._id} value={inst._id}>{inst.name} ({inst.code})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1">Department</label>
+                <select
+                  value={staffDeptId}
+                  onChange={(e) => setStaffDeptId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500"
+                >
+                  <option value="">Select Department</option>
+                  {departments.map(d => (
+                    <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Section (For Faculty) */}
+            {targetRole === 'faculty' && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                  <span>Assigned Section</span>
+                  <span className="text-[10px] text-emerald-400 font-semibold">Optional</span>
+                </label>
+                <select
+                  value={staffSecId}
+                  onChange={(e) => setStaffSecId(e.target.value)}
+                  className="w-full px-3 py-2.5 rounded-xl bg-slate-900 border border-slate-800 text-xs text-white outline-none focus:border-indigo-500"
+                >
+                  <option value="">Select Section</option>
+                  {sections.map(s => (
+                    <option key={s._id} value={s._id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Security Passcode */}
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1 flex items-center justify-between">
+                <span>Staff Security Passcode</span>
+                <span className="text-[10px] text-indigo-400 font-normal">Auto-approves if valid</span>
+              </label>
+              <input
+                type="text"
+                placeholder="Enter passcode if provided by Admin (Optional)"
+                value={staffPasscode}
+                onChange={(e) => setStaffPasscode(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-xs text-white placeholder-slate-500 outline-none font-mono"
+              />
+              <p className="text-[10px] text-slate-400 mt-1">
+                If omitted, your account will be submitted to your Institution Admin / HOD for approval.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Password</label>
+              <div className="relative">
+                <Lock className="w-4 h-4 text-slate-500 absolute left-3 top-3.5" />
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={staffPassword}
+                  onChange={(e) => setStaffPassword(e.target.value)}
+                  className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-slate-900/90 border border-slate-800 focus:border-indigo-500 text-sm text-white placeholder-slate-500 outline-none"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300 transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full py-3 rounded-xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-bold text-sm shadow-lg shadow-purple-600/30 flex items-center justify-center gap-2 transition-all active:scale-[0.98] disabled:opacity-50 mt-2"
+            >
+              {loading ? 'Submitting Registration...' : `Register as ${targetRole === 'hod' ? 'Head of Department' : 'Faculty / Staff'}`}
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </form>
+        )}
+
+        {/* FORM 3: INSTITUTION REGISTRATION */}
+        {!pendingApprovalMsg && activeTab === 'institution' && (
           <form onSubmit={handleInstitutionSubmit} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
