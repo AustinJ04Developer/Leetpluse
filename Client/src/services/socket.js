@@ -16,7 +16,7 @@ const getSocketURL = () => {
     return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
   }
 
-  return 'https://leetpluse.onrender.com';
+  return 'https://leetpulse.onrender.com';
 };
 
 

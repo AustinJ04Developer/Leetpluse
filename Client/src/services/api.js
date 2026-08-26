@@ -16,7 +16,7 @@ const getBaseURL = () => {
     return envUrl.endsWith('/') ? envUrl.slice(0, -1) : envUrl;
   }
   
-  return 'https://leetpluse.onrender.com/api';
+  return 'https://leetpulse.onrender.com/api';
 };
 
 

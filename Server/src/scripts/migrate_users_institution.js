@@ -1,5 +1,5 @@
 const path = require('path');
-const serverDir = 'd:/Projects/Leetpluse/Server';
+const serverDir = path.resolve(__dirname, '../../');
 const dotenv = require(path.join(serverDir, 'node_modules/dotenv'));
 dotenv.config({ path: path.join(serverDir, '.env') });
 const connectDB = require(path.join(serverDir, 'src/config/db'));
