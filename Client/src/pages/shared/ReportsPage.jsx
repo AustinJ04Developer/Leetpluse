@@ -1,8 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
-import { Download, FileText, Filter, CheckCircle } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { Download, FileText, Filter } from 'lucide-react';
+import RepresentativeScopeSwitcher from '../../components/RepresentativeScopeSwitcher';
 
 const ReportsPage = () => {
+  const { user } = useAuth();
   const [departments, setDepartments] = useState([]);
   const [batches, setBatches] = useState([]);
   const [sections, setSections] = useState([]);
@@ -10,8 +13,10 @@ const ReportsPage = () => {
   const [deptFilter, setDeptFilter] = useState('');
   const [batchFilter, setBatchFilter] = useState('');
   const [secFilter, setSecFilter] = useState('');
+  const [scopeType, setScopeType] = useState('section');
   
   const [downloading, setDownloading] = useState(false);
+  const isClassRep = user?.roleLevel === 2 || user?.role === 'student_rep';
 
   useEffect(() => {
     const fetchFilters = async () => {
@@ -34,7 +39,7 @@ const ReportsPage = () => {
   const handleDownloadCSV = async () => {
     setDownloading(true);
     try {
-      let url = '/reports/students/csv?';
+      let url = `/reports/students/csv?scopeType=${scopeType}&`;
       if (deptFilter) url += `departmentId=${deptFilter}&`;
       if (batchFilter) url += `batchId=${batchFilter}&`;
       if (secFilter) url += `sectionId=${secFilter}&`;
@@ -52,7 +57,7 @@ const ReportsPage = () => {
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
-      link.setAttribute('download', `institutional_student_report_${Date.now()}.csv`);
+      link.setAttribute('download', `${isClassRep ? (scopeType === 'batch' ? 'cohort_batch_report' : 'class_section_report') : 'institutional_student_report'}_${Date.now()}.csv`);
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -78,61 +83,74 @@ const ReportsPage = () => {
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <FileText className="w-7 h-7 text-indigo-400" />
-            <span>Institutional Reports Generator</span>
+            <span>{isClassRep ? 'Class Performance Reports Generator' : 'Institutional Reports Generator'}</span>
           </h1>
-          <p className="text-sm text-slate-400">Export student coding performance, solved difficulty counts, and streaks into CSV format</p>
+          <p className="text-sm text-slate-400">
+            {isClassRep ? 'Export coding performance, solved difficulty counts, and streaks for your assigned scope' : 'Export student coding performance, solved difficulty counts, and streaks into CSV format'}
+          </p>
         </div>
       </div>
 
       <div className="bg-slate-900/60 p-6 rounded-2xl border border-slate-800 space-y-6">
         <h2 className="text-lg font-semibold text-white flex items-center gap-2">
           <Filter className="w-5 h-5 text-indigo-400" />
-          <span>Report Export Scope & Filters</span>
+          <span>Report Export Scope</span>
         </h2>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="text-xs text-slate-400 mb-1 block">Department</label>
-            <select
-              value={deptFilter}
-              onChange={e => setDeptFilter(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="">All Departments</option>
-              {departments.map(d => (
-                <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
-              ))}
-            </select>
+        {isClassRep ? (
+          <div className="flex items-center justify-between p-4 rounded-xl bg-slate-900 border border-slate-800">
+            <span className="text-xs font-semibold text-slate-300">Select Export Scope:</span>
+            <RepresentativeScopeSwitcher
+              scopeType={scopeType}
+              onScopeChange={setScopeType}
+              hasBatch={!!(user?.batchId || user?.groupId)}
+            />
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Department</label>
+              <select
+                value={deptFilter}
+                onChange={e => setDeptFilter(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">All Departments</option>
+                {departments.map(d => (
+                  <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="text-xs text-slate-400 mb-1 block">Batch</label>
-            <select
-              value={batchFilter}
-              onChange={e => setBatchFilter(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="">All Batches</option>
-              {batches.map(b => (
-                <option key={b._id} value={b._id}>{b.name}</option>
-              ))}
-            </select>
-          </div>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Batch</label>
+              <select
+                value={batchFilter}
+                onChange={e => setBatchFilter(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">All Batches</option>
+                {batches.map(b => (
+                  <option key={b._id} value={b._id}>{b.name}</option>
+                ))}
+              </select>
+            </div>
 
-          <div>
-            <label className="text-xs text-slate-400 mb-1 block">Section</label>
-            <select
-              value={secFilter}
-              onChange={e => setSecFilter(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
-            >
-              <option value="">All Sections</option>
-              {sections.map(s => (
-                <option key={s._id} value={s._id}>{s.name}</option>
-              ))}
-            </select>
+            <div>
+              <label className="text-xs text-slate-400 mb-1 block">Section</label>
+              <select
+                value={secFilter}
+                onChange={e => setSecFilter(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-indigo-500"
+              >
+                <option value="">All Sections</option>
+                {sections.map(s => (
+                  <option key={s._id} value={s._id}>{s.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
-        </div>
+        )}
 
         <div className="pt-4 border-t border-slate-800 flex justify-end">
           <button

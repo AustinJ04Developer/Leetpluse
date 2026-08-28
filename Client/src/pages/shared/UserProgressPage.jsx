@@ -28,6 +28,8 @@ import {
   MoreHorizontal
 } from 'lucide-react';
 
+import RepresentativeScopeSwitcher from '../../components/RepresentativeScopeSwitcher';
+
 const UserProgressPage = () => {
   const { user: currentUser } = useAuth();
   const isSuperAdmin = (currentUser?.roleLevel || 1) >= 3;
@@ -36,6 +38,7 @@ const UserProgressPage = () => {
   const [membersProgress, setMembersProgress] = useState([]);
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('all');
+  const [scopeType, setScopeType] = useState('section');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   
@@ -56,7 +59,7 @@ const UserProgressPage = () => {
 
   useEffect(() => {
     loadProgressMatrix();
-  }, [selectedGroupId]);
+  }, [selectedGroupId, scopeType]);
 
   const loadGroups = async () => {
     try {
@@ -72,9 +75,9 @@ const UserProgressPage = () => {
   const loadProgressMatrix = async () => {
     try {
       setLoading(true);
-      let url = '/leetcode/progress-matrix';
+      let url = `/leetcode/progress-matrix?scopeType=${scopeType}`;
       if (selectedGroupId !== 'all') {
-        url += `?groupId=${selectedGroupId}`;
+        url += `&groupId=${selectedGroupId}`;
       }
       const res = await api.get(url);
       if (res.data.success) {
@@ -226,6 +229,8 @@ const UserProgressPage = () => {
     return { totalSolved, activeSolvers, totalEasy, totalMedium, totalHard, topPerformer };
   }, [filteredMembers]);
 
+  const isClassRep = currentUser?.roleLevel === 2 || currentUser?.role === 'student_rep';
+
   return (
     <div className="space-y-6">
       {/* Header Banner */}
@@ -238,14 +243,14 @@ const UserProgressPage = () => {
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-2xl font-extrabold text-white tracking-tight">
-                  Daily Progress Leaderboard
+                  {isClassRep ? 'Class Section Daily Progress' : 'Daily Progress Leaderboard'}
                 </h1>
                 <span className="text-xs px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold flex items-center gap-1">
                   <Sparkles className="w-3 h-3" /> Filtered Rankings
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-1">
-                Common leaderboard standings with interactive profile controls and date filtering.
+                {isClassRep ? 'Daily problem solving activity and standings for members in your assigned class section.' : 'Common leaderboard standings with interactive profile controls and date filtering.'}
               </p>
             </div>
           </div>
@@ -315,20 +320,28 @@ const UserProgressPage = () => {
 
             {/* Batch Filter & Search */}
             <div className="flex flex-wrap items-center gap-3">
-              <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
-                <Filter className="w-3.5 h-3.5 text-indigo-400" />
-                <span className="font-semibold text-slate-400">Batch:</span>
-                <select
-                  value={selectedGroupId}
-                  onChange={(e) => setSelectedGroupId(e.target.value)}
-                  className="bg-transparent font-bold text-white outline-none cursor-pointer"
-                >
-                  <option value="all" className="bg-slate-900">All Members (Org-Wide)</option>
-                  {groups.map(g => (
-                    <option key={g._id} value={g._id} className="bg-slate-900">{g.name}</option>
-                  ))}
-                </select>
-              </div>
+              {isClassRep ? (
+                <RepresentativeScopeSwitcher
+                  scopeType={scopeType}
+                  onScopeChange={setScopeType}
+                  hasBatch={!!(currentUser?.batchId || currentUser?.groupId)}
+                />
+              ) : (
+                <div className="flex items-center gap-2 bg-slate-900 border border-slate-800 px-3 py-1.5 rounded-xl text-xs">
+                  <Filter className="w-3.5 h-3.5 text-indigo-400" />
+                  <span className="font-semibold text-slate-400">Batch:</span>
+                  <select
+                    value={selectedGroupId}
+                    onChange={(e) => setSelectedGroupId(e.target.value)}
+                    className="bg-transparent font-bold text-white outline-none cursor-pointer"
+                  >
+                    <option value="all" className="bg-slate-900">All Members (Org-Wide)</option>
+                    {groups.map(g => (
+                      <option key={g._id} value={g._id} className="bg-slate-900">{g.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
               <div className="relative w-56">
                 <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />

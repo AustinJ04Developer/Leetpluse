@@ -1,16 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
 import { AlertTriangle, RefreshCw, Mail, ExternalLink, ShieldAlert } from 'lucide-react';
+import RepresentativeScopeSwitcher from '../../components/RepresentativeScopeSwitcher';
 
 const AtRiskStudentPage = () => {
+  const { user } = useAuth();
   const [atRiskStudents, setAtRiskStudents] = useState([]);
   const [thresholdDays, setThresholdDays] = useState(7);
+  const [scopeType, setScopeType] = useState('section');
   const [loading, setLoading] = useState(true);
+
+  const isClassRep = user?.roleLevel === 2 || user?.role === 'student_rep';
 
   const fetchAtRisk = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/students/at-risk');
+      const res = await api.get(`/students/at-risk?scopeType=${scopeType}`);
       if (res.data.success) {
         setAtRiskStudents(res.data.data);
         setThresholdDays(res.data.thresholdDays || 7);
@@ -24,7 +30,7 @@ const AtRiskStudentPage = () => {
 
   useEffect(() => {
     fetchAtRisk();
-  }, []);
+  }, [scopeType]);
 
   return (
     <div className="space-y-6">
@@ -42,13 +48,22 @@ const AtRiskStudentPage = () => {
             </p>
           </div>
         </div>
-        <button
-          onClick={fetchAtRisk}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-900/40 hover:bg-rose-800/60 text-rose-200 text-sm font-medium border border-rose-700/60 transition-all"
-        >
-          <RefreshCw className="w-4 h-4" />
-          <span>Refresh Alert Monitor</span>
-        </button>
+        <div className="flex items-center gap-3">
+          {isClassRep && (
+            <RepresentativeScopeSwitcher
+              scopeType={scopeType}
+              onScopeChange={setScopeType}
+              hasBatch={!!(user?.batchId || user?.groupId)}
+            />
+          )}
+          <button
+            onClick={fetchAtRisk}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-rose-900/40 hover:bg-rose-800/60 text-rose-200 text-sm font-medium border border-rose-700/60 transition-all"
+          >
+            <RefreshCw className="w-4 h-4" />
+            <span>Refresh Alert Monitor</span>
+          </button>
+        </div>
       </div>
 
       <div className="bg-slate-900/60 rounded-2xl border border-slate-800 overflow-hidden">

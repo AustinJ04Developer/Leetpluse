@@ -13,17 +13,34 @@ const escapeCSV = (val) => {
 
 exports.exportStudentReportCSV = async (req, res) => {
   try {
-    const { departmentId, batchId, sectionId } = req.query;
+    const { departmentId, batchId, sectionId, scopeType = 'section' } = req.query;
     const filter = { ...req.tenantFilter, role: { $in: ['student', 'student_rep', 'user'] } };
 
-    if (departmentId) filter.departmentId = departmentId;
-    if (batchId) filter.batchId = batchId;
-    if (sectionId) filter.sectionId = sectionId;
+    if (req.user.role === 'student_rep' || req.user.roleLevel === 2) {
+      if (scopeType === 'batch' && (req.user.groupId || req.user.batchId)) {
+        if (req.user.groupId) filter.groupId = req.user.groupId._id || req.user.groupId;
+        else if (req.user.batchId) filter.batchId = req.user.batchId._id || req.user.batchId;
+      } else {
+        if (req.user.departmentId) {
+          filter.departmentId = req.user.departmentId._id || req.user.departmentId;
+        }
+        if (req.user.sectionId) {
+          filter.sectionId = req.user.sectionId._id || req.user.sectionId;
+        } else if (!req.user.departmentId && req.user.batchId) {
+          filter.batchId = req.user.batchId._id || req.user.batchId;
+        }
+      }
+    } else {
+      if (departmentId) filter.departmentId = departmentId;
+      if (batchId) filter.batchId = batchId;
+      if (sectionId) filter.sectionId = sectionId;
+    }
 
     const students = await User.find(filter)
       .populate('departmentId', 'code name')
       .populate('batchId', 'name')
       .populate('sectionId', 'name')
+      .populate('groupId', 'name')
       .lean();
 
     const studentIds = students.map(s => s._id);
@@ -41,7 +58,7 @@ exports.exportStudentReportCSV = async (req, res) => {
       const name = escapeCSV(s.name || '');
       const email = escapeCSV(s.email || '');
       const dept = escapeCSV(s.departmentId?.code || 'N/A');
-      const batch = escapeCSV(s.batchId?.name || 'N/A');
+      const batch = escapeCSV(s.groupId?.name || s.batchId?.name || (s.academicCohorts && s.academicCohorts[0]) || 'N/A');
       const sec = escapeCSV(s.sectionId?.name || 'N/A');
       const year = escapeCSV(s.yearLevel ? `${s.yearLevel} Yr` : 'N/A');
       const sem = escapeCSV(s.semester ? `Sem ${s.semester}` : 'N/A');

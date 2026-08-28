@@ -7,6 +7,32 @@ const { emitToUser } = require('../services/socketService');
 const { getLeaderboardFilter } = require('../middleware/scope');
 
 
+const isUserInRequesterScope = (targetUser, requester) => {
+  if (!targetUser) return false;
+  if (targetUser._id.toString() === requester._id.toString()) return true;
+  
+  const targetDept = targetUser.departmentId?._id || targetUser.departmentId;
+  const reqDept = requester.departmentId?._id || requester.departmentId;
+  const targetSec = targetUser.sectionId?._id || targetUser.sectionId;
+  const reqSec = requester.sectionId?._id || requester.sectionId;
+
+  if (reqDept && reqSec && targetDept && targetSec) {
+    if (targetDept.toString() === reqDept.toString() && targetSec.toString() === reqSec.toString()) {
+      return true;
+    }
+  }
+
+  const targetBatch = targetUser.batchId?._id || targetUser.batchId;
+  const reqBatch = requester.batchId?._id || requester.batchId;
+  if (reqBatch && targetBatch && targetBatch.toString() === reqBatch.toString()) return true;
+
+  const targetGroup = targetUser.groupId?._id || targetUser.groupId;
+  const reqGroup = requester.groupId?._id || requester.groupId;
+  if (reqGroup && targetGroup && targetGroup.toString() === reqGroup.toString()) return true;
+
+  return false;
+};
+
 const getStats = async (req, res) => {
   try {
     const requester = req.user;
@@ -20,13 +46,13 @@ const getStats = async (req, res) => {
           message: 'Forbidden: Users are restricted to viewing their own statistics only.' 
         });
       }
-    } else if (requester.roleLevel === 2) { // Admin: Own batch stats only (including self)
+    } else if (requester.roleLevel === 2) { // Class Rep: Own class section stats only
       if (targetUserId.toString() !== requester._id.toString()) {
         const targetUser = await User.findById(targetUserId);
-        if (!targetUser || !targetUser.groupId || targetUser.groupId.toString() !== requester.groupId?.toString()) {
+        if (!isUserInRequesterScope(targetUser, requester)) {
           return res.status(403).json({ 
             success: false, 
-            message: 'Forbidden: Admins can only view statistics for users in their assigned batch.' 
+            message: 'Forbidden: Class Representatives can only view statistics for users in their assigned class section.' 
           });
         }
       }
@@ -59,8 +85,8 @@ const triggerSyncNow = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Forbidden: Cannot trigger sync for other users' });
     } else if (requester.roleLevel === 2 && targetUserId.toString() !== requester._id.toString()) {
       const targetUser = await User.findById(targetUserId);
-      if (!targetUser || !targetUser.groupId || targetUser.groupId.toString() !== requester.groupId?.toString()) {
-        return res.status(403).json({ success: false, message: 'Forbidden: Admins can only sync users in their assigned batch.' });
+      if (!isUserInRequesterScope(targetUser, requester)) {
+        return res.status(403).json({ success: false, message: 'Forbidden: Class Representatives can only sync users in their assigned class section.' });
       }
     }
 
@@ -92,14 +118,13 @@ const getHeatmap = async (req, res) => {
     const requester = req.user;
     let targetUserId = req.params.userId || requester._id.toString();
 
-    // Server-side Scope Enforcement: allow viewing heatmaps for cohort members
     if (targetUserId.toString() !== requester._id.toString()) {
       if (requester.roleLevel <= 2) {
         const targetUser = await User.findById(targetUserId);
-        if (!targetUser || !targetUser.groupId || !requester.groupId || targetUser.groupId.toString() !== requester.groupId.toString()) {
+        if (!isUserInRequesterScope(targetUser, requester)) {
           return res.status(403).json({ 
             success: false, 
-            message: 'Forbidden: Access restricted to members in your assigned cohort.' 
+            message: 'Forbidden: Access restricted to members in your assigned class section.' 
           });
         }
       }
@@ -116,9 +141,9 @@ const getHeatmap = async (req, res) => {
 const getLeaderboard = async (req, res) => {
   try {
     const requester = req.user;
-    const { groupId } = req.query;
+    const { groupId, scopeType = 'section' } = req.query;
     
-    const userFilter = getLeaderboardFilter(requester, groupId);
+    const userFilter = getLeaderboardFilter(requester, groupId, scopeType);
     userFilter.leetcodeUsername = { $ne: null, $exists: true };
 
     const eligibleUsers = await User.find(userFilter).select('_id');
@@ -149,15 +174,29 @@ const getLeaderboard = async (req, res) => {
 const getBatchProgressMatrix = async (req, res) => {
   try {
     const requester = req.user;
-    const { groupId } = req.query;
+    const { groupId, scopeType = 'section' } = req.query;
 
-    let userQuery = { role: { $in: ['student', 'user', 'faculty', 'admin'] } };
+    let userQuery = { role: { $in: ['student', 'student_rep', 'user', 'faculty', 'admin'] } };
 
-    if (requester.roleLevel < 5 && requester.institutionId) {
+    if (requester.role === 'student_rep' || requester.roleLevel === 2) {
+      if (scopeType === 'batch' && (requester.groupId || requester.batchId)) {
+        if (requester.groupId) userQuery.groupId = requester.groupId._id || requester.groupId;
+        else if (requester.batchId) userQuery.batchId = requester.batchId._id || requester.batchId;
+      } else {
+        if (requester.departmentId) {
+          userQuery.departmentId = requester.departmentId._id || requester.departmentId;
+        }
+        if (requester.sectionId) {
+          userQuery.sectionId = requester.sectionId._id || requester.sectionId;
+        } else if (!requester.departmentId && requester.batchId) {
+          userQuery.batchId = requester.batchId._id || requester.batchId;
+        }
+      }
+    } else if (requester.roleLevel < 5 && requester.institutionId) {
       userQuery.institutionId = requester.institutionId;
     }
 
-    if (groupId && groupId !== 'all') {
+    if (groupId && groupId !== 'all' && requester.roleLevel > 2) {
       userQuery.$or = [
         { batchId: groupId },
         { departmentId: groupId },
@@ -166,10 +205,11 @@ const getBatchProgressMatrix = async (req, res) => {
     }
 
     const users = await User.find(userQuery)
-      .select('name email avatar role leetcodeUsername xp level departmentId batchId sectionId registerNumber')
+      .select('name email avatar role leetcodeUsername xp level departmentId batchId sectionId groupId academicCohorts registerNumber')
       .populate('departmentId', 'name code')
       .populate('batchId', 'name')
       .populate('sectionId', 'name')
+      .populate('groupId', 'name description')
       .sort({ name: 1 });
 
     const userIds = users.map(u => u._id);

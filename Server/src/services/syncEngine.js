@@ -16,8 +16,11 @@ const runSyncCycle = async () => {
   console.log(`[Sync Engine] Starting 5-minute automated sync cycle at ${new Date().toISOString()}...`);
 
   try {
-    // Find all users with linked LeetCode handles
-    const users = await User.find({ leetcodeUsername: { $ne: '' }, isActive: true });
+    // Find all users with valid, linked LeetCode handles
+    const users = await User.find({ 
+      leetcodeUsername: { $ne: null, $exists: true, $regex: /\S+/ }, 
+      isActive: true 
+    });
     
     if (users.length === 0) {
       console.log('[Sync Engine] No users found with linked LeetCode handles.');

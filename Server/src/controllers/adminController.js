@@ -153,7 +153,11 @@ const exportGroupCsv = async (req, res) => {
     const { groupId } = req.query;
     let query = {};
 
-    if (groupId) {
+    if (req.user.role === 'student_rep' || req.user.roleLevel === 2) {
+      if (req.user.sectionId) query.sectionId = req.user.sectionId;
+      else if (req.user.batchId) query.batchId = req.user.batchId;
+      else if (req.user.groupId) query.groupId = req.user.groupId;
+    } else if (groupId) {
       query.groupId = groupId;
     } else if (req.user.roleLevel < 5) {
       // Non-superadmin users can only export their assigned cohort or institution users

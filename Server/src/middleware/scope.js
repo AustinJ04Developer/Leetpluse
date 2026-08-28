@@ -25,7 +25,7 @@ const getStatsVisibilityScope = (requester, targetUserId) => {
   return { allowed: true };
 };
 
-const getLeaderboardFilter = (requester, requestedGroupId) => {
+const getLeaderboardFilter = (requester, requestedGroupId, scopeType = 'section') => {
   const userFilter = { 
     role: { $in: ['student', 'user', 'admin', 'faculty', 'student_rep'] } 
   };
@@ -34,14 +34,20 @@ const getLeaderboardFilter = (requester, requestedGroupId) => {
     userFilter.institutionId = requester.institutionId;
   }
 
-  // Student Representative (CR / Level 2): Restrict leaderboard to own section or batch
+  // Student Representative (CR / Level 2): Restrict leaderboard to own section or cohort batch
   if (requester.role === 'student_rep' || requester.roleLevel === 2) {
-    if (requester.sectionId) {
-      userFilter.sectionId = requester.sectionId;
-    } else if (requester.batchId) {
-      userFilter.batchId = requester.batchId;
-    } else if (requester.departmentId) {
-      userFilter.departmentId = requester.departmentId;
+    if (scopeType === 'batch' && (requester.groupId || requester.batchId)) {
+      if (requester.groupId) userFilter.groupId = requester.groupId._id || requester.groupId;
+      else if (requester.batchId) userFilter.batchId = requester.batchId._id || requester.batchId;
+    } else {
+      if (requester.departmentId) {
+        userFilter.departmentId = requester.departmentId._id || requester.departmentId;
+      }
+      if (requester.sectionId) {
+        userFilter.sectionId = requester.sectionId._id || requester.sectionId;
+      } else if (!requester.departmentId && requester.batchId) {
+        userFilter.batchId = requester.batchId._id || requester.batchId;
+      }
     }
   } else if (requestedGroupId && requestedGroupId !== 'all') {
     userFilter.$or = [

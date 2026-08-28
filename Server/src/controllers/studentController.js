@@ -3,19 +3,40 @@ const LeetCodeStat = require('../models/LeetCodeStat');
 const Institution = require('../models/Institution');
 const { syncUserLeetCode } = require('../services/leetcodeService');
 
+const applyRepresentativeScopeFilter = (filter, req) => {
+  if (req.user.role === 'student_rep' || req.user.roleLevel === 2) {
+    const scopeType = req.query.scopeType || 'section';
+    if (scopeType === 'batch' && (req.user.groupId || req.user.batchId)) {
+      if (req.user.groupId) filter.groupId = req.user.groupId._id || req.user.groupId;
+      else if (req.user.batchId) filter.batchId = req.user.batchId._id || req.user.batchId;
+    } else {
+      if (req.user.departmentId) {
+        filter.departmentId = req.user.departmentId._id || req.user.departmentId;
+      }
+      if (req.user.sectionId) {
+        filter.sectionId = req.user.sectionId._id || req.user.sectionId;
+      } else if (!req.user.departmentId && req.user.batchId) {
+        filter.batchId = req.user.batchId._id || req.user.batchId;
+      }
+    }
+  } else {
+    if (req.query.departmentId) filter.departmentId = req.query.departmentId;
+    if (req.query.batchId) filter.batchId = req.query.batchId;
+    if (req.query.sectionId) filter.sectionId = req.query.sectionId;
+  }
+};
+
 // Get all students with tenant isolation & multi-level filters
 exports.getStudents = async (req, res) => {
   try {
-    const { departmentId, batchId, sectionId, semester, search, page = 1, limit = 50 } = req.query;
+    const { semester, search, page = 1, limit = 50 } = req.query;
 
     const filter = {
       ...req.tenantFilter,
-      role: { $in: ['student', 'user'] }
+      role: { $in: ['student', 'student_rep', 'user'] }
     };
 
-    if (departmentId) filter.departmentId = departmentId;
-    if (batchId) filter.batchId = batchId;
-    if (sectionId) filter.sectionId = sectionId;
+    applyRepresentativeScopeFilter(filter, req);
     if (semester) filter.semester = Number(semester);
 
     if (search) {
@@ -33,6 +54,7 @@ exports.getStudents = async (req, res) => {
       .populate('departmentId', 'name code')
       .populate('batchId', 'name')
       .populate('sectionId', 'name')
+      .populate('groupId', 'name description')
       .select('-passwordHash')
       .sort({ name: 1 })
       .skip((page - 1) * limit)
@@ -75,19 +97,16 @@ exports.getStudents = async (req, res) => {
 // Calculate Hierarchical Rankings (Section, Batch, Department, Institution)
 exports.getHierarchicalRankings = async (req, res) => {
   try {
-    const { departmentId, batchId, sectionId } = req.query;
-    const filter = { ...req.tenantFilter, role: { $in: ['student', 'user'] } };
-
-    if (departmentId) filter.departmentId = departmentId;
-    if (batchId) filter.batchId = batchId;
-    if (sectionId) filter.sectionId = sectionId;
+    const filter = { ...req.tenantFilter, role: { $in: ['student', 'student_rep', 'user'] } };
+    applyRepresentativeScopeFilter(filter, req);
 
     const students = await User.find(filter)
       .populate('institutionId', 'name code logoUrl primaryColor')
       .populate('departmentId', 'code name')
       .populate('batchId', 'name')
       .populate('sectionId', 'name')
-      .select('_id name email avatar leetcodeUsername institutionId departmentId batchId sectionId registerNumber')
+      .populate('groupId', 'name description')
+      .select('_id name email avatar leetcodeUsername institutionId departmentId batchId sectionId groupId academicCohorts registerNumber')
       .lean();
 
     const studentIds = students.map(s => s._id);
@@ -142,7 +161,7 @@ exports.getAtRiskStudents = async (req, res) => {
 
     const filter = {
       ...req.tenantFilter,
-      role: { $in: ['student', 'user'] },
+      role: { $in: ['student', 'student_rep', 'user'] },
       isActive: true,
       $or: [
         { lastActive: { $lt: cutoffDate } },
@@ -150,6 +169,8 @@ exports.getAtRiskStudents = async (req, res) => {
         { leetcodeUsername: { $in: [null, ''] } }
       ]
     };
+
+    applyRepresentativeScopeFilter(filter, req);
 
     const atRiskStudents = await User.find(filter)
       .populate('institutionId', 'name code logoUrl primaryColor')

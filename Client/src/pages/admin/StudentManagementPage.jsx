@@ -3,6 +3,8 @@ import api from '../../services/api';
 import { Users, Search, RefreshCw, Filter, CheckCircle, AlertTriangle, ExternalLink, Edit3, Trash2, X, Check } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
+import RepresentativeScopeSwitcher from '../../components/RepresentativeScopeSwitcher';
+
 const StudentManagementPage = () => {
   const { user } = useAuth();
   const [students, setStudents] = useState([]);
@@ -14,6 +16,7 @@ const StudentManagementPage = () => {
   const [deptFilter, setDeptFilter] = useState('');
   const [batchFilter, setBatchFilter] = useState('');
   const [secFilter, setSecFilter] = useState('');
+  const [scopeType, setScopeType] = useState('section');
   
   const [loading, setLoading] = useState(true);
   const [syncingId, setSyncingId] = useState(null);
@@ -51,7 +54,7 @@ const StudentManagementPage = () => {
   const fetchStudents = async () => {
     setLoading(true);
     try {
-      let url = `/students?search=${encodeURIComponent(search)}`;
+      let url = `/students?search=${encodeURIComponent(search)}&scopeType=${scopeType}`;
       if (deptFilter) url += `&departmentId=${deptFilter}`;
       if (batchFilter) url += `&batchId=${batchFilter}`;
       if (secFilter) url += `&sectionId=${secFilter}`;
@@ -73,7 +76,7 @@ const StudentManagementPage = () => {
 
   useEffect(() => {
     fetchStudents();
-  }, [search, deptFilter, batchFilter, secFilter]);
+  }, [search, deptFilter, batchFilter, secFilter, scopeType]);
 
   const handleSyncStudent = async (studentId) => {
     setSyncingId(studentId);
@@ -130,15 +133,19 @@ const StudentManagementPage = () => {
     }
   };
 
+  const isClassRep = user?.roleLevel === 2 || user?.role === 'student_rep';
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white flex items-center gap-2">
             <Users className="w-7 h-7 text-indigo-400" />
-            <span>Institutional Student Roster</span>
+            <span>{isClassRep ? 'Class Student Roster' : 'Institutional Student Roster'}</span>
           </h1>
-          <p className="text-sm text-slate-400">Manage students, edit profiles, assign roles, and sync statistics</p>
+          <p className="text-sm text-slate-400">
+            {isClassRep ? 'Monitor classmate profiles and sync LeetCode statistics for your assigned class section' : 'Manage students, edit profiles, assign roles, and sync statistics'}
+          </p>
         </div>
       </div>
 
@@ -155,40 +162,48 @@ const StudentManagementPage = () => {
           />
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <select
-            value={deptFilter}
-            onChange={e => setDeptFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-          >
-            <option value="">All Departments</option>
-            {departments.map(d => (
-              <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
-            ))}
-          </select>
+        {isClassRep ? (
+          <RepresentativeScopeSwitcher
+            scopeType={scopeType}
+            onScopeChange={setScopeType}
+            hasBatch={!!(user?.batchId || user?.groupId)}
+          />
+        ) : (
+          <div className="flex flex-wrap gap-3">
+            <select
+              value={deptFilter}
+              onChange={e => setDeptFilter(e.target.value)}
+              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">All Departments</option>
+              {departments.map(d => (
+                <option key={d._id} value={d._id}>{d.name} ({d.code})</option>
+              ))}
+            </select>
 
-          <select
-            value={batchFilter}
-            onChange={e => setBatchFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-          >
-            <option value="">All Batches</option>
-            {batches.map(b => (
-              <option key={b._id} value={b._id}>{b.name}</option>
-            ))}
-          </select>
+            <select
+              value={batchFilter}
+              onChange={e => setBatchFilter(e.target.value)}
+              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">All Batches</option>
+              {batches.map(b => (
+                <option key={b._id} value={b._id}>{b.name}</option>
+              ))}
+            </select>
 
-          <select
-            value={secFilter}
-            onChange={e => setSecFilter(e.target.value)}
-            className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
-          >
-            <option value="">All Sections</option>
-            {sections.map(s => (
-              <option key={s._id} value={s._id}>{s.name}</option>
-            ))}
-          </select>
-        </div>
+            <select
+              value={secFilter}
+              onChange={e => setSecFilter(e.target.value)}
+              className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-300 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">All Sections</option>
+              {sections.map(s => (
+                <option key={s._id} value={s._id}>{s.name}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {/* Student Table */}
@@ -233,7 +248,7 @@ const StudentManagementPage = () => {
                           </div>
                         )}
                         <span className="font-semibold text-slate-200">{s.departmentId?.code || 'N/A'}</span>
-                        <span className="text-slate-400"> • {s.batchId?.name || 'N/A'} ({s.sectionId?.name || 'Gen'})</span>
+                        <span className="text-slate-400"> • {s.groupId?.name || s.batchId?.name || (s.academicCohorts && s.academicCohorts[0]) || 'N/A'} ({s.sectionId?.name || 'Gen'})</span>
                       </td>
                       <td className="p-4">
                         {s.leetcodeUsername ? (

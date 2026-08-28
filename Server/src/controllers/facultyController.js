@@ -15,12 +15,24 @@ exports.getFacultyOverview = async (req, res) => {
 
     const sectionIds = sections.map(s => s._id);
 
-    // Get students in these assigned sections
-    const students = await User.find({
+    // Get students in assigned sections (or fallback to faculty department/institution)
+    let studentFilter = {
       institutionId: req.user.institutionId,
-      sectionId: { $in: sectionIds },
-      role: { $in: ['student', 'user'] }
-    }).populate('sectionId', 'name').populate('batchId', 'name').select('-passwordHash').lean();
+      role: { $in: ['student', 'student_rep', 'user'] }
+    };
+
+    if (sectionIds.length > 0) {
+      studentFilter.sectionId = { $in: sectionIds };
+    } else if (req.user.departmentId) {
+      studentFilter.departmentId = req.user.departmentId;
+    }
+
+    const students = await User.find(studentFilter)
+      .populate('sectionId', 'name')
+      .populate('batchId', 'name')
+      .populate('departmentId', 'code name')
+      .select('-passwordHash')
+      .lean();
 
     const studentIds = students.map(s => s._id);
     const statsList = await LeetCodeStat.find({ userId: { $in: studentIds } }).lean();

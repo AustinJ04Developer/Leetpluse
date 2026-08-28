@@ -2,7 +2,17 @@ const Goal = require('../models/Goal');
 
 const getGoals = async (req, res) => {
   try {
-    const goals = await Goal.find({ userId: req.user._id }).sort({ createdAt: -1 });
+    const user = req.user;
+    const filter = {
+      $or: [
+        { userId: user._id },
+        ...(user.sectionId ? [{ sectionId: user.sectionId }] : []),
+        ...(user.batchId ? [{ batchId: user.batchId }] : []),
+        ...(user.departmentId ? [{ departmentId: user.departmentId }] : []),
+        ...(user.institutionId ? [{ targetType: 'institution', institutionId: user.institutionId }] : [])
+      ]
+    };
+    const goals = await Goal.find(filter).sort({ createdAt: -1 });
     res.json({ success: true, goals });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

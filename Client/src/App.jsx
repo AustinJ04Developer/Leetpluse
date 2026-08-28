@@ -32,6 +32,7 @@ import GlobalLeaderboard from './pages/shared/GlobalLeaderboard';
 import NotificationsPage from './pages/shared/NotificationsPage';
 import SettingsPage from './pages/shared/SettingsPage';
 import UserProgressPage from './pages/shared/UserProgressPage';
+import WeeklyProblemsPage from './pages/shared/WeeklyProblemsPage';
 
 // Multi-Tenant Institutional Pages
 import InstitutionDashboard from './pages/admin/InstitutionDashboard';
@@ -133,7 +134,7 @@ function App() {
 
               {/* Shared */}
               <Route path="/user-progress" element={<ProtectedRoute minLevel={1}><UserProgressPage /></ProtectedRoute>} />
-              <Route path="/weekly-problems" element={<Navigate to="/user-progress" replace />} />
+              <Route path="/weekly-problems" element={<ProtectedRoute minLevel={1}><WeeklyProblemsPage /></ProtectedRoute>} />
               <Route path="/leaderboard" element={<GlobalLeaderboard />} />
               <Route path="/notifications" element={<NotificationsPage />} />
               <Route path="/settings" element={<SettingsPage />} />

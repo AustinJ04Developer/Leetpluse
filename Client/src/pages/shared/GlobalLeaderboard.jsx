@@ -3,12 +3,14 @@ import { useAuth } from '../../context/AuthContext';
 import api from '../../services/api';
 import { Trophy, Flame, Award, Globe, Users, Building2, Filter } from 'lucide-react';
 import UserAvatar from '../../components/UserAvatar';
+import RepresentativeScopeSwitcher from '../../components/RepresentativeScopeSwitcher';
 
 const GlobalLeaderboard = () => {
   const { user } = useAuth();
   const [leaderboard, setLeaderboard] = useState([]);
   const [groups, setGroups] = useState([]);
   const [selectedGroupId, setSelectedGroupId] = useState('all');
+  const [scopeType, setScopeType] = useState('section');
   const [loading, setLoading] = useState(true);
 
   const roleLevel = user?.roleLevel || 1;
@@ -17,21 +19,21 @@ const GlobalLeaderboard = () => {
 
   const loadGroups = async () => {
     try {
-      const res = await api.get('/institutions/batches/list');
+      const res = await api.get('/admin/group-overview');
       if (res.data.success) {
-        setGroups(res.data.data || []);
+        setGroups(res.data.groups || []);
       }
     } catch (err) {
-      // Fallback
+      console.error(err);
     }
   };
 
   const loadLeaderboard = async () => {
     setLoading(true);
     try {
-      let url = '/leetcode/leaderboard';
+      let url = `/leetcode/leaderboard?scopeType=${scopeType}`;
       if (selectedGroupId && selectedGroupId !== 'all') {
-        url += `?groupId=${selectedGroupId}`;
+        url += `&groupId=${selectedGroupId}`;
       }
       const res = await api.get(url);
       if (res.data.success) {
@@ -50,35 +52,45 @@ const GlobalLeaderboard = () => {
 
   useEffect(() => {
     loadLeaderboard();
-  }, [selectedGroupId]);
+  }, [selectedGroupId, scopeType]);
+
+  const isClassRep = user?.roleLevel === 2 || user?.role === 'student_rep';
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-white">
-            Institutional Global Leaderboard
+            {isClassRep ? 'Class Standings & Leaderboard' : 'Institutional Global Leaderboard'}
           </h1>
           <p className="text-xs text-slate-400">
-            Official standings for all student coders across all departments and batches
+            {isClassRep ? 'Official coding standings for members in your assigned section or cohort batch' : 'Official standings for all student coders across all departments and batches'}
           </p>
         </div>
 
         {/* Batch / Department Filter */}
-        <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
-          <Filter className="w-4 h-4 text-indigo-400 ml-2" />
-          <span className="text-xs font-semibold text-slate-300">Filter Batch:</span>
-          <select
-            value={selectedGroupId}
-            onChange={(e) => setSelectedGroupId(e.target.value)}
-            className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-white outline-none focus:border-indigo-500"
-          >
-            <option value="all">All Students (Institution-Wide)</option>
-            {groups.map(g => (
-              <option key={g._id} value={g._id}>{g.name} ({g.departmentId?.code || 'Dept'})</option>
-            ))}
-          </select>
-        </div>
+        {isClassRep ? (
+          <RepresentativeScopeSwitcher
+            scopeType={scopeType}
+            onScopeChange={setScopeType}
+            hasBatch={!!(user?.batchId || user?.groupId)}
+          />
+        ) : (
+          <div className="flex items-center gap-2 p-1.5 rounded-2xl bg-slate-900 border border-slate-800">
+            <Filter className="w-4 h-4 text-indigo-400 ml-2" />
+            <span className="text-xs font-semibold text-slate-300">Filter Batch:</span>
+            <select
+              value={selectedGroupId}
+              onChange={(e) => setSelectedGroupId(e.target.value)}
+              className="px-3 py-1.5 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-white outline-none focus:border-indigo-500"
+            >
+              <option value="all">All Students (Institution-Wide)</option>
+              {groups.map(g => (
+                <option key={g._id} value={g._id}>{g.name} ({g.departmentId?.code || 'Dept'})</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       <div className="glass-card rounded-3xl p-6 border border-slate-800 space-y-4">
