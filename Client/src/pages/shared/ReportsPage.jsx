@@ -40,7 +40,15 @@ const ReportsPage = () => {
       if (secFilter) url += `sectionId=${secFilter}&`;
 
       const response = await api.get(url, { responseType: 'blob' });
-      const blob = new Blob([response.data], { type: 'text/csv' });
+      
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const json = JSON.parse(text);
+        alert(json.message || 'Failed to generate report');
+        return;
+      }
+
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
       const downloadUrl = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = downloadUrl;
@@ -48,8 +56,17 @@ const ReportsPage = () => {
       document.body.appendChild(link);
       link.click();
       link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
     } catch (err) {
-      alert('Failed to generate report');
+      if (err.response?.data instanceof Blob && err.response.data.type === 'application/json') {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          alert(json.message || 'Failed to generate report');
+          return;
+        } catch (_) {}
+      }
+      alert(err.response?.data?.message || 'Failed to generate report');
     } finally {
       setDownloading(false);
     }

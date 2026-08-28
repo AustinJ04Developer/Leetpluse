@@ -138,23 +138,69 @@ const getGroupChallenges = async (req, res) => {
   }
 };
 
+const escapeCSV = (val) => {
+  if (val === null || val === undefined) return '""';
+  let str = String(val);
+  if (/^[=+\-@]/.test(str)) {
+    str = "'" + str;
+  }
+  str = str.replace(/"/g, '""');
+  return `"${str}"`;
+};
+
 const exportGroupCsv = async (req, res) => {
   try {
     const { groupId } = req.query;
-    const query = groupId ? { groupId } : {};
-    const users = await User.find(query).select('name email leetcodeUsername role xp level lastActive');
-    const userIds = users.map(u => u._id);
-    const stats = await LeetCodeStat.find({ userId: { $in: userIds } });
+    let query = {};
 
-    let csvContent = 'Name,Email,LeetCode Handle,Total Solved,Easy,Medium,Hard,Streak,Ranking,XP,Level\n';
+    if (groupId) {
+      query.groupId = groupId;
+    } else if (req.user.roleLevel < 5) {
+      // Non-superadmin users can only export their assigned cohort or institution users
+      const targetGroupId = req.user.groupId || null;
+      if (targetGroupId) {
+        query.groupId = targetGroupId;
+      } else {
+        query.$or = [{ adminId: req.user._id }, { _id: req.user._id }];
+      }
+    }
+
+    if (req.tenantFilter) {
+      query = { ...query, ...req.tenantFilter };
+    }
+
+    const users = await User.find(query).select('name email leetcodeUsername role xp level lastActive registerNumber studentId');
+    const userIds = users.map(u => u._id);
+    const stats = await LeetCodeStat.find({ userId: { $in: userIds } }).lean();
+    const statsMap = new Map(stats.map(st => [st.userId.toString(), st]));
+
+    let csvContent = '\uFEFF';
+    csvContent += 'Name,Email,Register Number,LeetCode Handle,Total Solved,Easy,Medium,Hard,Acceptance Rate (%),Streak,Contest Rating,Global Rank,XP,Level,Last Active\n';
+
     users.forEach(u => {
-      const s = stats.find(stat => stat.userId.toString() === u._id.toString()) || {};
-      csvContent += `"${u.name}","${u.email}","${u.leetcodeUsername || 'N/A'}",${s.totalSolved || 0},${s.easySolved || 0},${s.mediumSolved || 0},${s.hardSolved || 0},${s.currentStreak || 0},${s.globalRanking || 0},${u.xp || 0},${u.level || 1}\n`;
+      const s = statsMap.get(u._id.toString());
+      const name = escapeCSV(u.name || '');
+      const email = escapeCSV(u.email || '');
+      const reg = escapeCSV(u.registerNumber || 'N/A');
+      const handle = escapeCSV(u.leetcodeUsername || 'Not Linked');
+      const total = s?.totalSolved || 0;
+      const easy = s?.easySolved || 0;
+      const med = s?.mediumSolved || 0;
+      const hard = s?.hardSolved || 0;
+      const accRate = escapeCSV(s?.acceptanceRate != null ? `${s.acceptanceRate.toFixed(1)}%` : '0%');
+      const streak = s?.currentStreak || 0;
+      const rating = escapeCSV(s?.contestRating ? Math.round(s.contestRating) : 'N/A');
+      const rank = escapeCSV(s?.globalRanking ? s.globalRanking : 'N/A');
+      const xp = u.xp || 0;
+      const level = u.level || 1;
+      const lastActive = escapeCSV(u.lastActive ? new Date(u.lastActive).toISOString().split('T')[0] : 'N/A');
+
+      csvContent += `${name},${email},${reg},${handle},${total},${easy},${med},${hard},${accRate},${streak},${rating},${rank},${xp},${level},${lastActive}\n`;
     });
 
-    res.setHeader('Content-Type', 'text/csv');
-    res.setHeader('Content-Disposition', 'attachment; filename="group_performance_report.csv"');
-    res.send(csvContent);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename=group_performance_report_${Date.now()}.csv`);
+    return res.status(200).send(csvContent);
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }

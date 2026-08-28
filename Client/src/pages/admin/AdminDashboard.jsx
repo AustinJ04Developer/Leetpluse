@@ -15,8 +15,35 @@ const AdminDashboard = () => {
   const [selectedUserIds, setSelectedUserIds] = useState([]);
   const [notifyMsg, setNotifyMsg] = useState('');
   const [statusAlert, setStatusAlert] = useState('');
-  const [inspectingUser, setInspectingUser] = useState(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
+  const handleExportGroupCSV = async () => {
+    setExportingCsv(true);
+    try {
+      const response = await api.get('/admin/export-csv', { responseType: 'blob' });
+      if (response.data.type === 'application/json') {
+        const text = await response.data.text();
+        const json = JSON.parse(text);
+        alert(json.message || 'Failed to export cohort CSV');
+        return;
+      }
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.setAttribute('download', `group_performance_report_${Date.now()}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      alert('Failed to export cohort report CSV');
+    } finally {
+      setExportingCsv(false);
+    }
+  };
+
+  const [inspectingUser, setInspectingUser] = useState(null);
 
   // Add User to Batch Modal State
   const [showAddModal, setShowAddModal] = useState(false);
@@ -228,14 +255,14 @@ const AdminDashboard = () => {
               Add Student to Batch
             </button>
 
-            <a
-              href="/api/admin/export-csv"
-              download="group_performance.csv"
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-semibold text-xs shadow-md transition-colors"
+            <button
+              onClick={handleExportGroupCSV}
+              disabled={exportingCsv}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-white font-semibold text-xs shadow-md transition-colors disabled:opacity-50"
             >
-              <Download className="w-4 h-4 text-indigo-400" />
-              Export Cohort CSV
-            </a>
+              <Download className={`w-4 h-4 text-indigo-400 ${exportingCsv ? 'animate-bounce' : ''}`} />
+              <span>{exportingCsv ? 'Exporting...' : 'Export Cohort CSV'}</span>
+            </button>
           </div>
 
           {statusAlert && (
